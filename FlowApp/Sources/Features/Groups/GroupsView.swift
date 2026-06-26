@@ -3,14 +3,18 @@ import SwiftUI
 struct GroupsView: View {
     @EnvironmentObject var loc: Localization
     @State private var showCreate = false
+    @State private var showContacts = false
 
     private var groups: [ChatSummary] { MockData.chats.filter { $0.isGroup } }
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
+            HStack(spacing: 16) {
                 Text(loc.t("groups.title")).font(FlowTheme.title(30)).foregroundStyle(FlowTheme.ink)
                 Spacer()
+                Button { showContacts = true } label: {
+                    Image(systemName: "person.2").font(.system(size: 20)).foregroundStyle(FlowTheme.ink)
+                }
                 Button { showCreate = true } label: {
                     Image(systemName: "plus.circle.fill")
                         .font(.system(size: 24)).foregroundStyle(FlowTheme.teal)
@@ -20,7 +24,9 @@ struct GroupsView: View {
 
             ScrollView {
                 LazyVStack(spacing: 14) {
-                    ForEach(groups) { ChatRowView(chat: $0) }
+                    ForEach(Array(groups.enumerated()), id: \.element.id) { idx, g in
+                        ChatRowView(chat: g, seed: UInt64(idx + 50))
+                    }
 
                     Button { showCreate = true } label: {
                         HStack {
@@ -43,6 +49,7 @@ struct GroupsView: View {
         }
         .background(PaperBackground())
         .sheet(isPresented: $showCreate) { CreateGroupView().environmentObject(loc) }
+        .sheet(isPresented: $showContacts) { ContactsView().environmentObject(loc) }
     }
 }
 
@@ -67,7 +74,8 @@ struct CreateGroupView: View {
                     TextField(loc.t("groups.name"), text: $name)
                         .font(FlowTheme.body(16))
                         .padding(.horizontal, 14).padding(.vertical, 12)
-                        .background(RoundedRectangle(cornerRadius: FlowTheme.cornerField).fill(FlowTheme.beige))
+                        .background(RoundedRectangle(cornerRadius: FlowTheme.cornerField).fill(Color(hex: 0xFDFCF7)))
+                        .sketchBorder(FlowTheme.cornerField, width: 1.4, seed: 62)
 
                     Text(loc.t("groups.members")).font(FlowTheme.caption(13)).foregroundStyle(FlowTheme.gray)
                     VStack(spacing: 10) {
@@ -79,8 +87,7 @@ struct CreateGroupView: View {
                                     Avatar(initials: c.initials, tint: c.tint, size: 38)
                                     Text(c.name).font(FlowTheme.body(15)).foregroundStyle(FlowTheme.ink)
                                     Spacer()
-                                    Image(systemName: selected.contains(c.id) ? "checkmark.circle.fill" : "circle")
-                                        .foregroundStyle(selected.contains(c.id) ? FlowTheme.teal : FlowTheme.gray.opacity(0.5))
+                                    CheckBox(checked: selected.contains(c.id))
                                 }
                             }
                             .buttonStyle(.plain)

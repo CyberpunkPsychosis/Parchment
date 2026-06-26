@@ -9,9 +9,9 @@ struct ChatListView: View {
                 header
                 ScrollView {
                     LazyVStack(spacing: 14) {
-                        ForEach(MockData.chats) { chat in
+                        ForEach(Array(MockData.chats.enumerated()), id: \.element.id) { idx, chat in
                             NavigationLink(value: chat) {
-                                ChatRowView(chat: chat)
+                                ChatRowView(chat: chat, seed: UInt64(idx + 1))
                             }
                             .buttonStyle(.plain)
                         }
@@ -45,6 +45,7 @@ struct ChatListView: View {
 
 struct ChatRowView: View {
     let chat: ChatSummary
+    var seed: UInt64 = 1
 
     var body: some View {
         HStack(spacing: 12) {
@@ -80,11 +81,6 @@ struct ChatRowView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 18)
-                .fill(FlowTheme.card)
-                .shadow(color: FlowTheme.shadow, radius: 8, x: 0, y: 3)
-        )
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(FlowTheme.stroke, lineWidth: 1))
+        .sketchCard(18, fill: FlowTheme.card, seed: seed)
     }
 }

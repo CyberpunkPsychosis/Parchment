@@ -36,6 +36,7 @@ struct ServiceCardView: View {
                     .frame(height: 120)
                     .frame(maxWidth: .infinity)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .sketchBorder(14, width: 1.3, seed: 21)
 
                 Text(loc.lang == .zh ? service.titleZh : service.titleEn)
                     .font(FlowTheme.heading(18)).foregroundStyle(FlowTheme.ink)
@@ -44,7 +45,7 @@ struct ServiceCardView: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 HStack {
-                    JoinPill(title: loc.t("discover.join"))
+                    PillButton(title: loc.t("discover.join"), seed: 23)
                     Spacer()
                     HStack(spacing: 4) {
                         Image(systemName: "person.2.fill").font(.system(size: 12))

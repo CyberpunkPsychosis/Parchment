@@ -13,15 +13,16 @@ struct ChatDetailView: View {
                 VStack(spacing: 14) {
                     Text(loc.t("chat.today"))
                         .font(FlowTheme.caption(12))
-                        .foregroundStyle(FlowTheme.gray)
+                        .foregroundStyle(FlowTheme.ink.opacity(0.55))
                         .padding(.vertical, 6)
-                    ForEach(MockData.conversation) { msg in
-                        MessageRow(message: msg)
+                    ForEach(Array(MockData.conversation.enumerated()), id: \.element.id) { idx, msg in
+                        MessageRow(message: msg, seed: UInt64(idx + 30))
                     }
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
             }
+            .background(ChatBackground())
             inputBar
         }
         .background(PaperBackground())
@@ -65,16 +66,10 @@ struct ChatDetailView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 11)
-            .background(Capsule().fill(FlowTheme.beige))
-            .overlay(Capsule().stroke(FlowTheme.stroke, lineWidth: 1))
+            .background(RoundedRectangle(cornerRadius: 22).fill(Color.white.opacity(0.9)))
+            .sketchBorder(22, width: 1.4, seed: 42)
 
-            Text(loc.t("chat.send"))
-                .font(.system(size: 14, weight: .bold))
-                .tracking(0.5)
-                .foregroundStyle(.white)
-                .padding(.horizontal, 18)
-                .padding(.vertical, 12)
-                .background(Capsule().fill(FlowTheme.teal))
+            PillButton(title: loc.t("chat.send"), radius: 22, seed: 41)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -82,16 +77,28 @@ struct ChatDetailView: View {
     }
 }
 
+/// Gray-blue hand-drawn thread background (the dark sketch lightened).
+struct ChatBackground: View {
+    var body: some View {
+        ZStack {
+            Color(hex: 0xDFE3E2)
+            Image("paper_dark").resizable().scaledToFill().opacity(0.5)
+        }
+        .clipped()
+    }
+}
+
 struct MessageRow: View {
     @EnvironmentObject var loc: Localization
     let message: Message
+    var seed: UInt64 = 30
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 6) {
             if message.mine { Spacer(minLength: 50) }
             VStack(alignment: message.mine ? .trailing : .leading, spacing: 3) {
                 bubble
-                Text(message.time).font(FlowTheme.caption(10)).foregroundStyle(FlowTheme.gray)
+                Text(message.time).font(FlowTheme.caption(10)).foregroundStyle(FlowTheme.ink.opacity(0.55))
             }
             if !message.mine { Spacer(minLength: 50) }
         }
@@ -102,24 +109,20 @@ struct MessageRow: View {
         case .text(let t):
             Text(t)
                 .font(FlowTheme.body(15))
-                .foregroundStyle(message.mine ? .white : FlowTheme.ink)
+                .foregroundStyle(message.mine ? FlowTheme.sageInk : FlowTheme.ink)
                 .padding(.horizontal, 14).padding(.vertical, 10)
-                .background(
-                    RoundedRectangle(cornerRadius: 18)
-                        .fill(message.mine ? FlowTheme.sage : FlowTheme.beige)
-                )
+                .sketchCard(18, fill: message.mine ? FlowTheme.sage : Color(hex: 0xFCFAF4), seed: seed)
         case .image:
-            RoundedRectangle(cornerRadius: 16)
-                .fill(FlowTheme.beige)
-                .frame(width: 150, height: 96)
-                .overlay(
-                    Image(systemName: "photo")
-                        .font(.system(size: 26))
-                        .foregroundStyle(FlowTheme.gray)
-                )
-                .overlay(RoundedRectangle(cornerRadius: 16).stroke(FlowTheme.stroke, lineWidth: 1))
+            ZStack {
+                LinearGradient(colors: [Color(hex: 0xDCD0B8), Color(hex: 0xC9BBA0)],
+                               startPoint: .topLeading, endPoint: .bottomTrailing)
+                Image("paper_light").resizable().scaledToFill().opacity(0.6)
+            }
+            .frame(width: 132, height: 110)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .sketchBorder(16, width: 1.4, seed: seed)
         case .voice(let secs):
-            VoiceBubble(seconds: secs, mine: message.mine)
+            VoiceBubble(seconds: secs, mine: message.mine, seed: seed)
         }
     }
 }
@@ -127,24 +130,21 @@ struct MessageRow: View {
 struct VoiceBubble: View {
     let seconds: Int
     let mine: Bool
+    var seed: UInt64 = 30
+    private var fg: Color { mine ? FlowTheme.sageInk : FlowTheme.teal }
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: "play.circle.fill")
-                .font(.system(size: 26))
-                .foregroundStyle(mine ? .white : FlowTheme.teal)
+            Image(systemName: "play.circle.fill").font(.system(size: 26)).foregroundStyle(fg)
             HStack(spacing: 2) {
                 ForEach(0..<22, id: \.self) { i in
-                    Capsule()
-                        .fill((mine ? Color.white : FlowTheme.teal).opacity(0.85))
-                        .frame(width: 2.5, height: waveHeight(i))
+                    Capsule().fill(fg.opacity(0.8)).frame(width: 2.5, height: waveHeight(i))
                 }
             }
             Text("0:\(String(format: "%02d", seconds))")
-                .font(FlowTheme.caption(11))
-                .foregroundStyle(mine ? .white.opacity(0.9) : FlowTheme.gray)
+                .font(FlowTheme.caption(11)).foregroundStyle(fg.opacity(0.85))
         }
         .padding(.horizontal, 14).padding(.vertical, 10)
-        .background(RoundedRectangle(cornerRadius: 18).fill(mine ? FlowTheme.sage : FlowTheme.beige))
+        .sketchCard(18, fill: mine ? FlowTheme.sage : Color(hex: 0xFCFAF4), seed: seed)
     }
 
     private func waveHeight(_ i: Int) -> CGFloat {
