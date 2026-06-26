@@ -83,6 +83,26 @@ body{font-family:-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-s
 .foot-bar .qa{display:flex;align-items:center;gap:7px;background:rgba(0,0,0,.25);padding:6px 12px;border-radius:18px}
 .bat{width:20px;height:10px;border:1px solid #dfe5e7;border-radius:2px;position:relative;display:inline-block}
 .bat::after{content:'';position:absolute;left:1px;top:1px;bottom:1px;right:2px;background:#dfe5e7;border-radius:1px}
+/* second-row form screens */
+.form{width:322px;padding:18px 16px}
+.fbody{flex:1;overflow:auto;display:flex;flex-direction:column;gap:11px;padding:2px}
+.flbl{font-size:11.5px;color:var(--gray);margin-top:4px}
+.finput{background:#fdfcf7;border-radius:14px;padding:12px 14px;font-size:13.5px;color:var(--ink)}
+.finput.tall{padding-bottom:28px}
+.mrow{display:flex;align-items:center;gap:11px;padding:4px 2px}
+.mn{font-size:14px;font-weight:600;color:var(--ink)}
+.cbx{margin-left:auto;width:23px;height:23px;border-radius:6px;background:#fdfcf7;display:inline-flex;align-items:center;justify-content:center}
+.cbx.on{background:var(--teal)}
+.send.full{text-align:center;padding:14px;font-size:14px;border-radius:16px;margin-top:8px}
+.pcard{background:#fdfcf7;border-radius:20px;padding:16px}
+.ptop{display:flex;align-items:center;gap:13px;margin-bottom:11px}
+.pname{font-size:19px;font-weight:700}
+.ptitle{font-size:11.5px;color:var(--gray);margin-top:3px}
+.pdesc{font-size:12px;color:#54616a;line-height:1.55;margin:0 0 8px}
+.prow{display:flex;align-items:center;gap:11px;font-size:13px;padding:5px 0;color:var(--ink)}
+.clist{display:flex;flex-direction:column;gap:7px;margin-top:4px}
+.lirow{display:flex;align-items:center;gap:11px;padding:6px 2px}
+.idx{width:13px;font-size:11px;color:var(--gray);font-weight:700}
 </style></head>
 <body><svg style="position:absolute;width:0;height:0"><defs><filter id="rough"><feTurbulence type="fractalNoise" baseFrequency="0.026" numOctaves="2" seed="4" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="3.8" xChannelSelector="R" yChannelSelector="G"/></filter></defs></svg><div class="board"><div class="panels"><div class="panel side sk" style="--r:26px"><div class="paper"></div>
   <div class="logo"><div class="nm serif"><span class="sk" style="--r:9px 9px 9px 3px;display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;background:var(--ink);border-radius:9px 9px 9px 3px;color:#fff;font-family:Georgia,serif;font-weight:700;font-size:16px">F</span> FLOW</div><div class="av sk" style="--r:50%;width:34px;height:34px;background:#4A7C8122;color:#4A7C81;font-size:12px">AC</div></div>
@@ -102,4 +122,38 @@ body{font-family:-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-s
   <div class="setrow">Clash Mode<div class="sw sk" style="--r:14px"><b></b></div></div>
   <div class="setrow">Sliders<div class="sl sk" style="--r:3px"><b style="left:108px"></b></div></div>
   <div class="setrow">Sliders scheme<div class="sl sk" style="--r:3px"><b style="left:104px"></b></div></div>
-  <div class="setrow">Selected scheme <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--gray)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M9 5l7 7-7 7"/></svg></div></div></div></div><div class="foot-bar"><div class="left"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#dfe5e7" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M2 8.5C8 3.5 16 3.5 22 8.5"/><path d="M5 12c4-3.3 10-3.3 14 0"/><path d="M8.5 15.5c2-1.6 5-1.6 7 0"/><circle cx="12" cy="19" r="1" fill="currentColor" stroke="none"/></svg> Connectivity</div><div class="mid">100% <span class="bat"></span></div><div class="qa"><div class="av sk" style="--r:50%;width:22px;height:22px;background:#4A7C8122;color:#4A7C81;font-size:9px">AC</div> Quick access ⌄</div></div></div></body></html>
+  <div class="setrow">Selected scheme <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--gray)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M9 5l7 7-7 7"/></svg></div></div></div></div><div class="foot-bar"><div class="left"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#dfe5e7" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M2 8.5C8 3.5 16 3.5 22 8.5"/><path d="M5 12c4-3.3 10-3.3 14 0"/><path d="M8.5 15.5c2-1.6 5-1.6 7 0"/><circle cx="12" cy="19" r="1" fill="currentColor" stroke="none"/></svg> Connectivity</div><div class="mid">100% <span class="bat"></span></div><div class="qa"><div class="av sk" style="--r:50%;width:22px;height:22px;background:#4A7C8122;color:#4A7C81;font-size:9px">AC</div> Quick access ⌄</div></div></div><div class="board" style="margin-top:30px"><div class="panels"><div class="panel form sk" style="--r:26px"><div class="paper"></div>
+  <div class="hd"><h1 class="serif">Create Group</h1><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="var(--teal)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><circle cx="9" cy="9" r="3"/><path d="M3.5 19c.6-3.2 3-4.6 5.5-4.6 1 0 2 .2 2.8.6"/><path d="M17 14v6M14 17h6"/></svg></div>
+  <div class="fbody">
+    <div class="flbl">群组名称 / Group name</div>
+    <div class="finput sk" style="--r:14px">Founders &amp; Friends</div>
+    <div class="flbl">添加成员 / Members</div>
+    <div class="mrow"><div class="av sk" style="--r:50%;width:34px;height:34px;background:#4A7C8122;color:#4A7C81;font-size:13px">陈</div><span class="mn">陈亚历山大</span><span class="cbx sk" style="--r:6px"></span></div>
+    <div class="mrow"><div class="av sk" style="--r:50%;width:34px;height:34px;background:#86a89222;color:#86a892;font-size:13px">李</div><span class="mn">李娜</span><span class="cbx on sk" style="--r:6px"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M5 12.5l4.5 4.5L19 6.5"/></svg></span></div>
+    <div class="mrow"><div class="av sk" style="--r:50%;width:34px;height:34px;background:#3C666A22;color:#3C666A;font-size:13px">张</div><span class="mn">张强</span><span class="cbx on sk" style="--r:6px"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M5 12.5l4.5 4.5L19 6.5"/></svg></span></div>
+    <div class="flbl">群组描述 / Description</div>
+    <div class="finput tall sk" style="--r:14px">A private circle for early ideas.</div>
+    <div class="send full sk" style="--r:16px">创建 / Create</div>
+  </div></div><div class="panel form sk" style="--r:26px"><div class="paper"></div>
+  <div class="hd"><h1 class="serif">Profile</h1><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--ink)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M4 20h16"/><path d="M6 16.5l9.2-9.2 2.5 2.5L8.5 19H6z"/></svg></div>
+  <div class="fbody">
+    <div class="pcard sk" style="--r:20px">
+      <div class="ptop"><div class="av sk" style="--r:50%;width:62px;height:62px;background:#86a89222;color:#86a892;font-size:24px">陈</div><div><div class="pname serif">陈亚历山大</div><div class="ptitle">首席顾问 / Company of Teams</div></div></div>
+      <p class="pdesc">滨海企业家，战略及咨询顾问。专注品牌、用户体验与增长，热爱手绘与设计。</p>
+      <div class="prow"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="var(--teal)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M6 9h13M5 15h13M10 4L8 20M16 4l-2 16"/></svg> +1009 0023 / Rata</div>
+      <div class="prow"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="var(--teal)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M6 4h3l1.8 4.5-2.3 1.6c.9 2.4 2.4 3.9 4.8 4.8l1.6-2.3L19.5 16v3c0 1-.8 1.8-1.8 1.7C10.8 20.2 4.8 14.2 4.3 6.8 4.2 5.8 5 5 6 5z"/></svg> (123) 455-7879</div>
+      <div class="prow"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="var(--teal)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><rect x="3.5" y="6" width="17" height="12" rx="2"/><path d="M4 7l8 6 8-6"/></svg> chioifoism@gmail.com</div>
+      <div style="display:flex;justify-content:flex-end;margin-top:12px"><div class="send sk" style="--r:22px">编辑 / Edit</div></div>
+    </div>
+  </div></div><div class="panel form sk" style="--r:26px"><div class="paper"></div>
+  <div class="hd"><h1 class="serif">Contacts</h1></div>
+  <div class="fbody">
+    <div class="finput sk" style="--r:14px;display:flex;align-items:center;gap:8px;color:var(--gray)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--gray)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><circle cx="11" cy="11" r="6.5"/><path d="M20.5 20.5l-4.3-4.3"/></svg> 搜索联系人 / Search</div>
+    <div class="clist">
+      <div class="lirow"><span class="idx">A</span><div class="av sk" style="--r:50%;width:38px;height:38px;background:#8C8F9322;color:#8C8F93;font-size:15px">ON</div><span class="mn">Original names</span></div>
+      <div class="lirow"><span class="idx">W</span><div class="av sk" style="--r:50%;width:38px;height:38px;background:#4A7C8122;color:#4A7C81;font-size:15px">王</div><span class="mn">王伟</span></div>
+      <div class="lirow"><span class="idx">L</span><div class="av sk" style="--r:50%;width:38px;height:38px;background:#86a89222;color:#86a892;font-size:15px">李</div><span class="mn">李娜</span></div>
+      <div class="lirow"><span class="idx">Z</span><div class="av sk" style="--r:50%;width:38px;height:38px;background:#3C666A22;color:#3C666A;font-size:15px">张</div><span class="mn">张强</span></div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:auto"><div class="send sk" style="--r:22px">添加 / Add</div></div>
+  </div></div></div></div></body></html>
