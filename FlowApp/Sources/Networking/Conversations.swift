@@ -19,6 +19,8 @@ struct ConversationDTO: Codable, Identifiable, Hashable {
     var unread: Int
     var pinned: Bool?
     var muted: Bool?
+    var companion_id: Int?         // 搭子会话：搭子 id（不依赖成员列表加载）
+    var companion_adopted: Bool = false
 
     var tintColor: Color { FlowTheme.tint(tint) }
 

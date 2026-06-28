@@ -52,13 +52,14 @@ struct ConversationView: View {
 
     private var myId: Int? { auth.user?.id }
     private var aiMembers: [ConvMemberDTO] { members.filter { $0.is_ai } }
-    /// 搭子 1:1 会话对应的搭子 id（用于查看记忆 / 编辑搭子）。
+    /// 搭子 1:1 会话对应的搭子 id（优先用会话自带的，避免依赖成员列表是否已加载）。
     private var companionId: Int? {
-        conversation.type == "companion" ? aiMembers.first?.companion_id : nil
+        guard conversation.type == "companion" else { return nil }
+        return conversation.companion_id ?? aiMembers.first?.companion_id
     }
     /// 认领来的搭子：锁定记忆/人设（保留惊喜感）。
     private var isAdoptedCompanion: Bool {
-        conversation.type == "companion" && (aiMembers.first?.adopted ?? false)
+        conversation.type == "companion" && (conversation.companion_adopted || (aiMembers.first?.adopted ?? false))
     }
 
     /// 输入 @ 后的候选成员（含搭子），按当前查询前缀过滤。
@@ -214,9 +215,10 @@ struct ConversationView: View {
         Task {
             let m = try? await APIClient.shared.sendMessage(conversationId: conversation.id, content: text, replyToId: replyId)
             await MainActor.run { if let m { appendUnique(m) }; sending = false }
-            // 私聊里如果有 AI 搭子，自动让它接话
-            if conversation.type == "companion" || (!conversation.is_group && aiMembers.count == 1),
-               let only = aiMembers.first?.companion_id {
+            // 搭子 1:1：自动让它接话（用会话自带的 companionId，不依赖成员列表是否已加载）
+            if conversation.type == "companion", let only = companionId {
+                await summon(only)
+            } else if !conversation.is_group, aiMembers.count == 1, let only = aiMembers.first?.companion_id {
                 await summon(only)
             } else if conversation.is_group {
                 // 群里 @ 了某个搭子 → 让它接话（可同时 @ 多个）

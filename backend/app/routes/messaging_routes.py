@@ -170,6 +170,8 @@ def conv_dict(db: Session, conv: Conversation, uid: int) -> dict:
             .order_by(Message.created_at.desc()).first())
 
     avatar_url = None
+    companion_id = None        # 搭子会话：把搭子 id/认领标记直接挂在会话上，前端不必等成员列表加载
+    companion_adopted = False
     if conv.type == "group":
         g = db.query(Group).filter(Group.id == conv.group_id).first() if conv.group_id else None
         if g:  # 社群
@@ -182,6 +184,8 @@ def conv_dict(db: Session, conv: Conversation, uid: int) -> dict:
         c = db.query(Companion).filter(Companion.id == cm.companion_id).first() if cm else None
         title = c.name if c else "AI"; avatar = c.avatar if c else "AI"; tint = c.tint if c else "teal"
         avatar_url = c.avatar_url if c else None
+        companion_id = cm.companion_id if cm else None
+        companion_adopted = (c.forked_from_snapshot_id is not None) if c else False
     else:  # direct
         other = next((m for m in human if m.user_id != uid), None)
         u = db.query(User).filter(User.id == other.user_id).first() if other else None
@@ -215,6 +219,8 @@ def conv_dict(db: Session, conv: Conversation, uid: int) -> dict:
             "is_group": conv.type == "group",
             "member_count": len(members),   # 含 AI 搭子：加搭子后群人数 +1
             "member_cap": conv.member_cap,
+            "companion_id": companion_id,
+            "companion_adopted": companion_adopted,
             "announcement": conv.announcement,
             "preview": preview,
             "time": (last.created_at if last else conv.updated_at).isoformat(),
