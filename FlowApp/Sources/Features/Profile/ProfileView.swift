@@ -93,6 +93,12 @@ struct ProfileView: View {
                         Text(loc.t(auth.isPro ? "auth.member.pro" : "auth.member.free"))
                             .font(FlowTheme.caption(13)).foregroundStyle(auth.isPro ? FlowTheme.teal : FlowTheme.gray)
                     }
+                    if let city = auth.user?.city, !city.isEmpty {
+                        HStack(spacing: 3) {
+                            Image(systemName: "mappin.and.ellipse").font(.system(size: 11))
+                            Text(city).font(FlowTheme.caption(13))
+                        }.foregroundStyle(FlowTheme.gray).padding(.top, 1)
+                    }
                     if let bio = auth.user?.bio, !bio.isEmpty {
                         Text(bio).font(FlowTheme.caption(13)).foregroundStyle(FlowTheme.gray)
                             .multilineTextAlignment(.center).padding(.top, 2)

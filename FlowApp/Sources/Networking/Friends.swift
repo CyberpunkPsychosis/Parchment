@@ -7,6 +7,7 @@ struct FriendUser: Codable, Identifiable, Hashable {
     let tint: String
     var avatar_url: String? = nil
     var bio: String? = nil
+    var city: String? = nil
     var is_friend: Bool
     var outgoing_pending: Bool
     var incoming_pending: Bool

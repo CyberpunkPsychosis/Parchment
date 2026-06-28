@@ -53,7 +53,12 @@ struct MomentsView: View {
                             Avatar(initials: p.author_initials, tint: FlowTheme.tint(["teal","sage","tealDark","ink","gray"][p.author_id % 5]), size: 40, seed: seed, imageURL: p.author_avatar_url)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(p.author_name).font(.system(size: 15, weight: .semibold)).foregroundStyle(FlowTheme.ink)
-                                Text(p.shortTime).font(FlowTheme.caption(11)).foregroundStyle(FlowTheme.gray)
+                                HStack(spacing: 6) {
+                                    Text(p.displayTime).font(FlowTheme.caption(11)).foregroundStyle(FlowTheme.gray)
+                                    if let c = p.author_city, !c.isEmpty {
+                                        Text("· \(c)").font(FlowTheme.caption(11)).foregroundStyle(FlowTheme.gray)
+                                    }
+                                }
                             }
                             Spacer()
                         }
@@ -274,7 +279,12 @@ struct PostDetailView: View {
                         Avatar(initials: current.author_initials, tint: FlowTheme.tint(["teal","sage","tealDark","ink","gray"][current.author_id % 5]), size: 44, imageURL: current.author_avatar_url)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(current.author_name).font(.system(size: 16, weight: .semibold)).foregroundStyle(FlowTheme.ink)
-                            Text(current.shortTime).font(FlowTheme.caption(11)).foregroundStyle(FlowTheme.gray)
+                            HStack(spacing: 6) {
+                                Text(current.displayTime).font(FlowTheme.caption(11)).foregroundStyle(FlowTheme.gray)
+                                if let c = current.author_city, !c.isEmpty {
+                                    Text("· \(c)").font(FlowTheme.caption(11)).foregroundStyle(FlowTheme.gray)
+                                }
+                            }
                         }
                         Spacer()
                     }

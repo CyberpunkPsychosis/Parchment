@@ -9,6 +9,7 @@ struct EditProfileView: View {
 
     @State private var nickname = ""
     @State private var bio = ""
+    @State private var city = ""
     @State private var avatarURL: String?
     @State private var photoItem: PhotosPickerItem?
     @State private var uploading = false
@@ -45,6 +46,7 @@ struct EditProfileView: View {
 
                     field(loc.t("profile.nickname"), text: $nickname, seed: 31)
                     field(loc.t("profile.signature"), text: $bio, seed: 32)
+                    field(loc.t("profile.city"), text: $city, seed: 33)
                 }
                 .padding(.horizontal, 20)
             }
@@ -53,6 +55,7 @@ struct EditProfileView: View {
         .onAppear {
             nickname = auth.user?.nickname ?? ""
             bio = auth.user?.bio ?? ""
+            city = auth.user?.city ?? ""
             avatarURL = auth.user?.avatar_url
         }
         .onChange(of: photoItem) { _, item in
@@ -83,7 +86,8 @@ struct EditProfileView: View {
         saving = true
         Task {
             await auth.updateProfile(nickname: nickname.trimmingCharacters(in: .whitespaces),
-                                     avatarURL: avatarURL ?? "", bio: bio)
+                                     avatarURL: avatarURL ?? "", bio: bio,
+                                     city: city.trimmingCharacters(in: .whitespaces))
             await MainActor.run { saving = false; dismiss() }
         }
     }

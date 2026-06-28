@@ -107,6 +107,7 @@ final class Localization: ObservableObject {
         "profile.save":    [.zh: "保存", .en: "Save"],
         "profile.nickname":[.zh: "昵称", .en: "Nickname"],
         "profile.signature":[.zh: "个性签名", .en: "Signature"],
+        "profile.city":    [.zh: "所在城市", .en: "City"],
         "profile.companions":[.zh: "TA 的公开搭子", .en: "Public companions"],
         "friends.title":    [.zh: "好友", .en: "Friends"],
         "friends.add":      [.zh: "添加好友", .en: "Add Friend"],

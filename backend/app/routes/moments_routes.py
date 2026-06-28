@@ -22,7 +22,8 @@ def _post_dict(db: Session, p: Post, uid: int) -> dict:
     author = db.query(User).filter(User.id == p.author_id).first()
     return {"id": p.id, "author_id": p.author_id, "author_name": p.author_name,
             "author_initials": _initials(p.author_name),
-            "author_avatar_url": author.avatar_url if author else None, "content": p.content,
+            "author_avatar_url": author.avatar_url if author else None,
+            "author_city": author.city if author else None, "content": p.content,
             "image_url": p.image_url, "created_at": p.created_at.isoformat(),
             "like_count": likes, "liked": liked, "comment_count": comments}
 

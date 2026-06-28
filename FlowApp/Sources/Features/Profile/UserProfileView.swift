@@ -25,6 +25,12 @@ struct UserProfileView: View {
                             Text(bio).font(FlowTheme.caption(13)).foregroundStyle(FlowTheme.gray).multilineTextAlignment(.center).padding(.horizontal, 30)
                         }
                         Text(u.nickname).font(FlowTheme.heading(22)).foregroundStyle(FlowTheme.ink)
+                        if let c = u.city, !c.isEmpty {
+                            HStack(spacing: 3) {
+                                Image(systemName: "mappin.and.ellipse").font(.system(size: 11))
+                                Text(c).font(FlowTheme.caption(13))
+                            }.foregroundStyle(FlowTheme.gray)
+                        }
 
                         if !u.is_me {
                             HStack(spacing: 12) {

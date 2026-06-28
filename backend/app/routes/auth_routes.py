@@ -60,6 +60,7 @@ class SettingsIn(BaseModel):
     nickname: str | None = Field(default=None, max_length=40)
     avatar_url: str | None = None
     bio: str | None = Field(default=None, max_length=200)
+    city: str | None = Field(default=None, max_length=20)
 
 
 @router.patch("/me/settings")
@@ -74,6 +75,8 @@ def update_settings(body: SettingsIn,
         user.avatar_url = body.avatar_url or None
     if body.bio is not None:
         user.bio = body.bio
+    if body.city is not None:
+        user.city = body.city.strip() or None
     db.commit()
     db.refresh(user)
     return user.public_dict()

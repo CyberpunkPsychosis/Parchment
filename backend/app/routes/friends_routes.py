@@ -38,7 +38,7 @@ def _user_dict(db: Session, u: User, me: int) -> dict:
     return {
         "id": u.id, "nickname": u.nickname or u.email.split("@")[0],
         "initials": _initials(u.nickname or u.email), "tint": _tint(u.id),
-        "avatar_url": u.avatar_url, "bio": u.bio,
+        "avatar_url": u.avatar_url, "bio": u.bio, "city": u.city,
         "is_friend": are_friends(db, me, u.id),
         "outgoing_pending": _pending_between(db, me, u.id) is not None,
         "incoming_pending": _pending_between(db, u.id, me) is not None,

@@ -39,6 +39,7 @@ class User(Base):
     nickname = Column(String, nullable=False, default="")
     avatar_url = Column(String, nullable=True)   # 真实头像（无则前端用首字母）
     bio = Column(String, nullable=True)          # 个性签名
+    city = Column(String, nullable=True)         # 所在城市
     tier = Column(String, nullable=False, default="free")  # "free" | "pro"
     tier_expiry = Column(DateTime, nullable=True)
     auto_send_stickers = Column(Boolean, nullable=True)  # None=未选择(首次询问), True/False=已记住偏好
@@ -62,6 +63,7 @@ class User(Base):
             "nickname": self.nickname,
             "avatar_url": self.avatar_url,
             "bio": self.bio,
+            "city": self.city,
             "tier": "pro" if self.is_pro else "free",
             "tier_expiry": self.tier_expiry.isoformat() if self.tier_expiry else None,
             "auto_send_stickers": self.auto_send_stickers,  # null=首次未选

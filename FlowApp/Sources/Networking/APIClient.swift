@@ -8,6 +8,7 @@ struct AppUser: Codable, Equatable {
     var nickname: String
     var avatar_url: String?
     var bio: String?
+    var city: String?
     var tier: String          // "free" | "pro"
     var tier_expiry: String?
     var auto_send_stickers: Bool?   // null=首次未选
@@ -208,11 +209,11 @@ final class APIClient {
     }
 
     func updateSettings(autoSendStickers: Bool? = nil, nickname: String? = nil,
-                        avatarURL: String? = nil, bio: String? = nil) async throws -> AppUser {
-        struct Body: Encodable { let auto_send_stickers: Bool?; let nickname: String?; let avatar_url: String?; let bio: String? }
+                        avatarURL: String? = nil, bio: String? = nil, city: String? = nil) async throws -> AppUser {
+        struct Body: Encodable { let auto_send_stickers: Bool?; let nickname: String?; let avatar_url: String?; let bio: String?; let city: String? }
         let req = try makeRequest("/me/settings", method: "PATCH",
                                   body: Body(auto_send_stickers: autoSendStickers, nickname: nickname,
-                                             avatar_url: avatarURL, bio: bio))
+                                             avatar_url: avatarURL, bio: bio, city: city))
         return try await send(req, as: AppUser.self)
     }
 
