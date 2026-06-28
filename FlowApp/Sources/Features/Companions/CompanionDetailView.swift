@@ -54,7 +54,7 @@ struct CompanionDetailView: View {
             Avatar(initials: companion.avatar, tint: companion.tintColor, size: 76, seed: 9, imageURL: companion.avatar_url)
             HStack(spacing: 6) {
                 Text(companion.name).font(FlowTheme.heading(20)).foregroundStyle(FlowTheme.ink)
-                LevelBadge(level: companion.level, stage: companion.stage, tint: companion.tintColor)
+                LevelBadge(level: companion.level, tint: companion.tintColor)
             }
             VStack(spacing: 4) {
                 ExpBar(progress: companion.levelProgress, tint: companion.tintColor)

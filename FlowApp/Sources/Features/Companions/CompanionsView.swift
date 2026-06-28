@@ -122,7 +122,7 @@ struct CompanionRow: View {
                     Text(companion.name)
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(FlowTheme.ink)
-                    LevelBadge(level: companion.level, stage: companion.stage, tint: companion.tintColor)
+                    LevelBadge(level: companion.level, tint: companion.tintColor)
                 }
                 Text(companion.memory_count > 0
                      ? "\(loc.t("companion.memoryCount"))\(companion.memory_count)"
@@ -143,16 +143,12 @@ struct CompanionRow: View {
 /// 等级 + 阶段小徽章。
 struct LevelBadge: View {
     let level: Int
-    let stage: String
     var tint: Color = FlowTheme.teal
     var body: some View {
-        HStack(spacing: 4) {
-            Text("Lv.\(level)").font(.system(size: 10, weight: .bold))
-            Text(stage).font(.system(size: 10, weight: .medium))
-        }
-        .foregroundStyle(.white)
-        .padding(.horizontal, 7).padding(.vertical, 2)
-        .background(Capsule().fill(tint))
+        Text("Lv.\(level)").font(.system(size: 10, weight: .bold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 7).padding(.vertical, 2)
+            .background(Capsule().fill(tint))
     }
 }
 

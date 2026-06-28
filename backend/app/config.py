@@ -17,7 +17,16 @@ PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "http://localhost:8000")
 STORAGE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage")
 
 # --- 每日 AI 调用上限（防刷爆成本）---
-DAILY_LIMITS = {"free": 20, "pro": 100}
+# 0 或负数 = 不限量。测试期默认全部放开；上线要限量时在 .env 设
+# DAILY_LIMIT_FREE / DAILY_LIMIT_PRO（如 20 / 100）即可，无需改代码。
+def _int_env(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, ""))
+    except (TypeError, ValueError):
+        return default
+
+DAILY_LIMITS = {"free": _int_env("DAILY_LIMIT_FREE", 0),
+                "pro": _int_env("DAILY_LIMIT_PRO", 0)}
 
 # --- 上下文截断：每次最多发给模型的历史消息条数（控制输入 token）---
 MAX_CONTEXT_MESSAGES = 30

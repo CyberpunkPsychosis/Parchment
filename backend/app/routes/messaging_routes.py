@@ -591,7 +591,7 @@ async def _award_growth_extras(db: Session, comp: Companion, user: User, leveled
     # 升级
     if leveled:
         db.add(CompanionMilestone(companion_id=comp.id, kind="level_up",
-                                  content=f"成长到 Lv.{g['level']} · {g['stage']}"))
+                                  content=f"升到 Lv.{g['level']}"))
     # 相伴 N 天
     days = (datetime.utcnow() - comp.created_at).days if comp.created_at else 0
     for t in _DAY_MILESTONES:
@@ -604,7 +604,7 @@ async def _award_growth_extras(db: Session, comp: Companion, user: User, leveled
     if leveled:
         try:
             line = await complete_chat(tier, [{"role": "user", "content":
-                f"你刚升到了 Lv.{g['level']}（{g['stage']}阶段）。用第一人称写一句简短的成长日记，"
+                f"你刚升到了 Lv.{g['level']}。用第一人称写一句简短的成长日记，"
                 f"温暖、有点小情绪，不超过30字。只输出这句话。"}], system=comp.persona)
             line = (line or "").strip().strip('"「」')[:80]
         except Exception:

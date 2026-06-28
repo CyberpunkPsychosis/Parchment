@@ -236,7 +236,7 @@ struct ConversationView: View {
                 appendUnique(m)
                 if let g = m.companion_growth { headerGrowth = g }
                 if m.leveled_up == true, let g = m.companion_growth {
-                    showLevelUp("\(m.sender_name) \(loc.t("growth.levelUp")) Lv.\(g.level) · \(g.stage)")
+                    showLevelUp("\(m.sender_name) \(loc.t("growth.levelUp")) Lv.\(g.level)")
                 }
             }
             aiBusy = false
@@ -307,7 +307,7 @@ struct ConversationView: View {
                 HStack(spacing: 6) {
                     Text(conversation.title).font(.system(size: 16, weight: .semibold)).foregroundStyle(FlowTheme.ink)
                     if let g = headerGrowth {
-                        LevelBadge(level: g.level, stage: g.stage, tint: conversation.tintColor)
+                        LevelBadge(level: g.level, tint: conversation.tintColor)
                     }
                 }
                 if conversation.is_group {
