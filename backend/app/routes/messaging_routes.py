@@ -9,7 +9,8 @@ from sqlalchemy.orm import Session
 from ..deps import get_current_user
 from ..db import get_db, SessionLocal
 from ..auth import decode_token
-from ..models import (User, Companion, Group, Conversation, ConversationMember, Message, Memory)
+from ..models import (User, Companion, Group, Conversation, ConversationMember, Message, Memory,
+                      MessageReaction)
 from ..providers import complete_chat
 from ..usage import consume
 
@@ -79,8 +80,17 @@ def ensure_group_conversation(db: Session, group: Group) -> Conversation:
     return c
 
 
+def _reactions(db: Session, mid: int) -> list[dict]:
+    rows = db.query(MessageReaction).filter(MessageReaction.message_id == mid).all()
+    counts: dict[str, int] = {}
+    for r in rows:
+        counts[r.emoji] = counts.get(r.emoji, 0) + 1
+    return [{"emoji": e, "count": n} for e, n in counts.items()]
+
+
 def serialize_message(db: Session, m: Message) -> dict:
     """uid 无关的消息 DTO；客户端用 sender_user_id 判断是否自己发的。"""
+    reactions = _reactions(db, m.id)
     if m.sender_companion_id:
         c = db.query(Companion).filter(Companion.id == m.sender_companion_id).first()
         name = c.name if c else "AI"
@@ -89,7 +99,7 @@ def serialize_message(db: Session, m: Message) -> dict:
                 "sender_user_id": None, "companion_id": m.sender_companion_id,
                 "sender_name": name, "sender_avatar": c.avatar if c else "AI",
                 "sender_avatar_url": None,
-                "sender_tint": c.tint if c else "teal", "is_ai": True}
+                "sender_tint": c.tint if c else "teal", "is_ai": True, "reactions": reactions}
     u = db.query(User).filter(User.id == m.sender_user_id).first() if m.sender_user_id else None
     name = u.nickname if u else "用户"
     return {"id": m.id, "conversation_id": m.conversation_id, "kind": m.kind,
@@ -97,7 +107,7 @@ def serialize_message(db: Session, m: Message) -> dict:
             "sender_user_id": m.sender_user_id, "companion_id": None,
             "sender_name": name, "sender_avatar": _initials(name),
             "sender_avatar_url": u.avatar_url if u else None,
-            "sender_tint": _tint_for(m.sender_user_id or 0), "is_ai": False}
+            "sender_tint": _tint_for(m.sender_user_id or 0), "is_ai": False, "reactions": reactions}
 
 
 def conv_dict(db: Session, conv: Conversation, uid: int) -> dict:
@@ -214,7 +224,23 @@ async def ws_endpoint(ws: WebSocket, token: str = Query(default="")):
     await manager.connect(uid, ws)
     try:
         while True:
-            await ws.receive_text()  # 心跳/忽略；发送走 REST
+            raw = await ws.receive_text()
+            try:
+                data = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            # 正在输入：广播给会话内其他成员
+            if data.get("type") == "typing" and data.get("conversation_id"):
+                cid = data["conversation_id"]
+                db = SessionLocal()
+                try:
+                    others = [u for u in member_ids(db, cid) if u != uid]
+                    me = db.query(User).filter(User.id == uid).first()
+                    name = me.nickname if me else ""
+                finally:
+                    db.close()
+                await manager.send_to_users(others, {"type": "typing", "conversation_id": cid,
+                                                     "user_id": uid, "name": name})
     except WebSocketDisconnect:
         manager.disconnect(uid, ws)
     except Exception:
@@ -539,6 +565,44 @@ def remove_member(cid: int, body: RemoveMemberIn,
     if row:
         db.delete(row); db.commit()
     return {"ok": True}
+
+
+@router.post("/messages/{mid}/recall")
+async def recall_message(mid: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    m = db.query(Message).filter(Message.id == mid).first()
+    if not m or m.sender_user_id != user.id:
+        raise HTTPException(status_code=403, detail="只能撤回自己的消息")
+    cid = m.conversation_id
+    db.query(MessageReaction).filter(MessageReaction.message_id == mid).delete()
+    db.delete(m); db.commit()
+    await manager.send_to_users(member_ids(db, cid),
+                                {"type": "recall", "conversation_id": cid, "message_id": mid})
+    return {"ok": True}
+
+
+class ReactIn(BaseModel):
+    emoji: str
+
+
+@router.post("/messages/{mid}/react")
+async def react_message(mid: int, body: ReactIn,
+                        user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    m = db.query(Message).filter(Message.id == mid).first()
+    if not m or not is_member(db, m.conversation_id, user.id):
+        raise HTTPException(status_code=403, detail="无权访问")
+    existing = db.query(MessageReaction).filter(
+        MessageReaction.message_id == mid, MessageReaction.user_id == user.id,
+        MessageReaction.emoji == body.emoji).first()
+    if existing:
+        db.delete(existing)
+    else:
+        db.add(MessageReaction(message_id=mid, user_id=user.id, emoji=body.emoji))
+    db.commit()
+    reactions = _reactions(db, mid)
+    await manager.send_to_users(member_ids(db, m.conversation_id),
+                                {"type": "reaction", "conversation_id": m.conversation_id,
+                                 "message_id": mid, "reactions": reactions})
+    return {"reactions": reactions}
 
 
 @router.post("/conversations/{cid}/read")
