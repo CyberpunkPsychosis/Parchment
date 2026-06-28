@@ -4,7 +4,9 @@ struct ChatListView: View {
     @EnvironmentObject var loc: Localization
     @EnvironmentObject var auth: AuthStore
     @State private var showProfile = false
-    @State private var showNewChat = false
+    @State private var showFriends = false
+    @State private var showCreateGroup = false
+    @State private var showAddFriend = false
     @State private var conversations: [ConversationDTO] = []
     @State private var loaded = false
 
@@ -41,7 +43,9 @@ struct ChatListView: View {
         .sheet(isPresented: $showProfile) {
             ProfileView().environmentObject(loc).environmentObject(auth)
         }
-        .sheet(isPresented: $showNewChat) { ContactsView() }
+        .sheet(isPresented: $showFriends) { ContactsView() }
+        .sheet(isPresented: $showCreateGroup) { CreateGroupView { _ in Task { await reload() } } }
+        .sheet(isPresented: $showAddFriend) { AddFriendView() }
     }
 
     private func reload() async {
@@ -77,9 +81,13 @@ struct ChatListView: View {
                 .font(FlowTheme.title(30))
                 .foregroundStyle(FlowTheme.ink)
             Spacer()
-            Button { showNewChat = true } label: {
-                Image(systemName: "square.and.pencil")
-                    .font(.system(size: 20, weight: .medium))
+            Menu {
+                Button { showFriends = true } label: { Label(loc.t("new.chat"), systemImage: "bubble.left") }
+                Button { showCreateGroup = true } label: { Label(loc.t("new.group"), systemImage: "person.3") }
+                Button { showAddFriend = true } label: { Label(loc.t("friends.add"), systemImage: "person.badge.plus") }
+            } label: {
+                Image(systemName: "plus.circle")
+                    .font(.system(size: 22, weight: .medium))
                     .foregroundStyle(FlowTheme.ink)
             }
         }

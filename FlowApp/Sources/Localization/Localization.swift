@@ -32,6 +32,8 @@ final class Localization: ObservableObject {
         "chats.title":     [.zh: "我的聊天", .en: "My Chats"],
         "chats.empty":     [.zh: "还没有会话，去发现/群组里开始聊天吧", .en: "No chats yet — start one from Discover/Groups"],
         "groups.friendEmpty":[.zh: "还没有好友群，点 + 拉好友建群", .en: "No friend groups — tap + to create one"],
+        "new.chat":        [.zh: "发起聊天", .en: "New chat"],
+        "new.group":       [.zh: "创建群聊", .en: "New group"],
         "conv.members":    [.zh: "位成员", .en: "members"],
         "conv.addAI":      [.zh: "加入 AI 搭子", .en: "Add AI companion"],
         "conv.summon":     [.zh: "让", .en: "Ask "],
