@@ -1,9 +1,11 @@
 import SwiftUI
 
-/// 社群列表：mineOnly=false 为"社群广场(全部)"，true 为"我加入的社群"。点卡片进详情。
+/// 社群列表：mineOnly=false 为"社群广场(全部，隐藏已加入)"，true 为"我加入的社群"。
+/// entersChat=true 时点卡片直接进群聊；否则进社群详情（仅发现页用）。
 struct GroupPlazaView: View {
     @EnvironmentObject var loc: Localization
     var mineOnly: Bool = false
+    var entersChat: Bool = false
 
     @State private var groups: [PlazaGroup] = []
     @State private var loading = true
@@ -11,6 +13,7 @@ struct GroupPlazaView: View {
     @State private var showCodeAlert = false
     @State private var codeInput = ""
     @State private var toast: String?
+    @State private var route: ConversationDTO?
 
     var body: some View {
         ScrollView {
@@ -30,14 +33,20 @@ struct GroupPlazaView: View {
             } else {
                 LazyVStack(spacing: 14) {
                     ForEach(Array(groups.enumerated()), id: \.element.id) { idx, g in
-                        NavigationLink(value: g) { groupCard(g, seed: UInt64(idx + 300)) }
-                            .buttonStyle(.plain)
+                        if entersChat {
+                            Button { openChat(g) } label: { groupCard(g, seed: UInt64(idx + 300)) }
+                                .buttonStyle(.plain)
+                        } else {
+                            NavigationLink(value: g) { groupCard(g, seed: UInt64(idx + 300)) }
+                                .buttonStyle(.plain)
+                        }
                     }
                 }
                 .padding(.horizontal, 16).padding(.vertical, 10)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .navigationDestination(item: $route) { conv in ConversationView(conversation: conv) }
         .overlay(alignment: .bottom) { toastView }
         .sheet(isPresented: $showCreate) {
             CreatePlazaGroupView { _ in Task { await load() } }.environmentObject(loc)
@@ -103,8 +112,18 @@ struct GroupPlazaView: View {
 
     private func load() async {
         loading = true
-        groups = (try? await (mineOnly ? APIClient.shared.myGroups() : APIClient.shared.groupPlaza())) ?? []
+        var rows = (try? await (mineOnly ? APIClient.shared.myGroups() : APIClient.shared.groupPlaza())) ?? []
+        if !mineOnly { rows = rows.filter { !$0.is_member } }  // 发现页不显示已加入
+        groups = rows
         loading = false
+    }
+
+    private func openChat(_ g: PlazaGroup) {
+        Task {
+            if let conv = try? await APIClient.shared.openGroupConversation(groupId: g.id) {
+                await MainActor.run { route = conv }
+            }
+        }
     }
 
     private func joinByCode() {

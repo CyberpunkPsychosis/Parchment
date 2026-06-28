@@ -10,6 +10,7 @@ struct CommunityDetailView: View {
     @State private var detail: PlazaGroup?
     @State private var joining = false
     @State private var toast: String?
+    @State private var route: ConversationDTO?
 
     private var g: PlazaGroup { detail ?? group }
 
@@ -92,6 +93,7 @@ struct CommunityDetailView: View {
         }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
+        .navigationDestination(item: $route) { conv in ConversationView(conversation: conv) }
         .task { detail = try? await APIClient.shared.groupDetail(id: group.id) }
     }
 
@@ -99,9 +101,17 @@ struct CommunityDetailView: View {
         joining = true
         Task {
             if let r = try? await APIClient.shared.joinGroup(id: group.id) {
-                await MainActor.run { toast = r.pending == true ? loc.t("group.appliedToast") : loc.t("group.joinedToast") }
-                detail = try? await APIClient.shared.groupDetail(id: group.id)
-                onChanged()
+                if r.pending == true {
+                    await MainActor.run { toast = loc.t("group.appliedToast") }
+                    detail = try? await APIClient.shared.groupDetail(id: group.id)
+                    onChanged()
+                } else {
+                    // 加入成功 → 直接进群聊
+                    onChanged()
+                    if let conv = try? await APIClient.shared.openGroupConversation(groupId: group.id) {
+                        await MainActor.run { route = conv }
+                    }
+                }
             }
             joining = false
         }
