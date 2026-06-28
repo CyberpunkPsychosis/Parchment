@@ -243,6 +243,30 @@ final class APIClient {
         return try await send(req, as: Memory.self)
     }
 
+    // MARK: 搭子成长档案（亲密度 / 里程碑 / 动态 / 家谱）
+
+    func companionAffinity(_ cid: Int) async throws -> AffinityDTO {
+        let req = try makeRequest("/companions/\(cid)/affinity", method: "GET")
+        return try await send(req, as: AffinityDTO.self)
+    }
+
+    func companionMilestones(_ cid: Int) async throws -> [MilestoneDTO] {
+        struct Result: Decodable { let milestones: [MilestoneDTO] }
+        let req = try makeRequest("/companions/\(cid)/milestones", method: "GET")
+        return try await send(req, as: Result.self).milestones
+    }
+
+    func companionDiary(_ cid: Int) async throws -> [DiaryDTO] {
+        struct Result: Decodable { let diary: [DiaryDTO] }
+        let req = try makeRequest("/companions/\(cid)/diary", method: "GET")
+        return try await send(req, as: Result.self).diary
+    }
+
+    func companionLineage(_ cid: Int) async throws -> LineageDTO {
+        let req = try makeRequest("/companions/\(cid)/lineage", method: "GET")
+        return try await send(req, as: LineageDTO.self)
+    }
+
     // MARK: 认领市场
 
     func listMarket() async throws -> [MarketItem] {

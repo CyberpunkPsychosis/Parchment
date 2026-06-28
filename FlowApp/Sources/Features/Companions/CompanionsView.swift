@@ -8,6 +8,7 @@ struct CompanionsView: View {
     @State private var loading = true
     @State private var showCreate = false
     @State private var publishTarget: Companion?
+    @State private var detailTarget: Companion?
 
     var body: some View {
         NavigationStack {
@@ -24,6 +25,9 @@ struct CompanionsView: View {
                                 }
                                 .buttonStyle(.plain)
                                 .contextMenu {
+                                    Button { detailTarget = c } label: {
+                                        Label(loc.t("growth.profile"), systemImage: "chart.line.uptrend.xyaxis")
+                                    }
                                     Button { publishTarget = c } label: {
                                         Label(loc.t("publish.menu"), systemImage: "square.and.arrow.up")
                                     }
@@ -54,6 +58,9 @@ struct CompanionsView: View {
         }
         .sheet(item: $publishTarget) { c in
             PublishView(companion: c).environmentObject(loc)
+        }
+        .sheet(item: $detailTarget) { c in
+            CompanionDetailView(companion: c).environmentObject(loc)
         }
         .task { await load() }
     }

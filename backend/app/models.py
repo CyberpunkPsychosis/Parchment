@@ -375,3 +375,64 @@ class Sticker(Base):
             "is_favorite": self.is_favorite,
             "created_at": self.created_at.isoformat(),
         }
+
+
+class CompanionAffinity(Base):
+    """每个用户与某搭子的亲密度（共同养成里"我和它有多熟"）。"""
+    __tablename__ = "companion_affinity"
+    __table_args__ = (UniqueConstraint("companion_id", "user_id", name="uq_affinity"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    companion_id = Column(Integer, index=True, nullable=False)
+    user_id = Column(Integer, index=True, nullable=False)
+    points = Column(Integer, nullable=False, default=0)
+    aff_day = Column(String, nullable=True)        # 当日计点日期(防刷)
+    aff_today = Column(Integer, nullable=False, default=0)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    def bump(self, amount: int = 3, daily_cap: int = 60) -> int:
+        today = datetime.utcnow().date().isoformat()
+        if self.aff_day != today:
+            self.aff_day = today
+            self.aff_today = 0
+        room = max(0, daily_cap - (self.aff_today or 0))
+        gained = min(amount, room)
+        self.points = (self.points or 0) + gained
+        self.aff_today = (self.aff_today or 0) + gained
+        self.updated_at = datetime.utcnow()
+        return self.points
+
+    def public_dict(self) -> dict:
+        pts = self.points or 0
+        level = companion_level(pts)   # 复用同一曲线展示"亲密等级"
+        lo, hi = level_exp_bounds(level)
+        return {"points": pts, "level": level, "level_min": lo, "level_max": hi}
+
+
+class CompanionMilestone(Base):
+    """搭子里程碑/纪念（首次聊天、升级、相伴 N 天）。"""
+    __tablename__ = "companion_milestones"
+
+    id = Column(Integer, primary_key=True, index=True)
+    companion_id = Column(Integer, index=True, nullable=False)
+    kind = Column(String, nullable=False, default="")   # first_chat | level_up | days_N
+    content = Column(String, nullable=False, default="")
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    def public_dict(self) -> dict:
+        return {"id": self.id, "kind": self.kind, "content": self.content,
+                "created_at": self.created_at.isoformat()}
+
+
+class CompanionDiary(Base):
+    """搭子成长日记/动态（升级、里程碑时由模型写一句）。"""
+    __tablename__ = "companion_diary"
+
+    id = Column(Integer, primary_key=True, index=True)
+    companion_id = Column(Integer, index=True, nullable=False)
+    content = Column(String, nullable=False, default="")
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    def public_dict(self) -> dict:
+        return {"id": self.id, "content": self.content,
+                "created_at": self.created_at.isoformat()}

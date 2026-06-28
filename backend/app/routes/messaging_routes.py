@@ -10,7 +10,7 @@ from ..deps import get_current_user
 from ..db import get_db, SessionLocal
 from ..auth import decode_token
 from ..models import (User, Companion, Group, Conversation, ConversationMember, Message, Memory,
-                      MessageReaction)
+                      MessageReaction, CompanionAffinity, CompanionMilestone, CompanionDiary)
 from ..providers import complete_chat
 from ..usage import consume
 
@@ -511,6 +511,56 @@ async def _learn_from_chat(db: Session, comp: Companion, cid: int, tier: str):
     db.commit()
 
 
+_DAY_MILESTONES = [7, 30, 100, 365]
+
+
+def _milestone_exists(db: Session, cid: int, kind: str) -> bool:
+    return db.query(CompanionMilestone).filter(
+        CompanionMilestone.companion_id == cid, CompanionMilestone.kind == kind).first() is not None
+
+
+async def _award_growth_extras(db: Session, comp: Companion, user: User, leveled: bool, tier: str):
+    """互动后：涨亲密度；首聊/升级/相伴N天落里程碑；升级写成长日记。"""
+    # 亲密度（按天封顶）
+    aff = (db.query(CompanionAffinity)
+           .filter(CompanionAffinity.companion_id == comp.id, CompanionAffinity.user_id == user.id).first())
+    if not aff:
+        aff = CompanionAffinity(companion_id=comp.id, user_id=user.id, points=0)
+        db.add(aff)
+    aff.bump()
+
+    g = comp.growth_dict()
+    # 首次互动
+    if not _milestone_exists(db, comp.id, "first_chat"):
+        db.add(CompanionMilestone(companion_id=comp.id, kind="first_chat",
+                                  content="第一次和大家说话 🌱"))
+    # 升级
+    if leveled:
+        db.add(CompanionMilestone(companion_id=comp.id, kind="level_up",
+                                  content=f"成长到 Lv.{g['level']} · {g['stage']}"))
+    # 相伴 N 天
+    days = (datetime.utcnow() - comp.created_at).days if comp.created_at else 0
+    for t in _DAY_MILESTONES:
+        if days >= t and not _milestone_exists(db, comp.id, f"days_{t}"):
+            db.add(CompanionMilestone(companion_id=comp.id, kind=f"days_{t}",
+                                      content=f"相伴 {t} 天啦 🎉"))
+    db.commit()
+
+    # 升级时写一句成长日记（模型生成，失败用模板兜底）
+    if leveled:
+        try:
+            line = await complete_chat(tier, [{"role": "user", "content":
+                f"你刚升到了 Lv.{g['level']}（{g['stage']}阶段）。用第一人称写一句简短的成长日记，"
+                f"温暖、有点小情绪，不超过30字。只输出这句话。"}], system=comp.persona)
+            line = (line or "").strip().strip('"「」')[:80]
+        except Exception:
+            line = ""
+        if not line:
+            line = f"今天我成长到了 Lv.{g['level']}，谢谢一直陪着我的你们。"
+        db.add(CompanionDiary(companion_id=comp.id, content=line))
+        db.commit()
+
+
 class AIReplyIn(BaseModel):
     companion_id: int
 
@@ -554,6 +604,11 @@ async def ai_reply(cid: int, body: AIReplyIn,
     # 共同养成：回复后从对话里学记忆（群按贡献者标记）
     try:
         await _learn_from_chat(db, comp, cid, tier)
+    except Exception:
+        pass
+    # 亲密度 / 里程碑 / 成长日记
+    try:
+        await _award_growth_extras(db, comp, user, leveled, tier)
     except Exception:
         pass
     payload = serialize_message(db, out)

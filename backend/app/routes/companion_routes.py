@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session
 
 from ..deps import get_current_user
 from ..db import get_db
-from ..models import User, Companion, Memory
+from ..models import (User, Companion, Memory, CompanionAffinity, CompanionMilestone,
+                      CompanionDiary, CompanionSnapshot)
 
 router = APIRouter(tags=["companion"])
 
@@ -130,3 +131,58 @@ def delete_memory(mid: int, user: User = Depends(get_current_user), db: Session 
     db.delete(m)
     db.commit()
     return {"ok": True}
+
+
+# ---------- J：亲密度 + 里程碑 ----------
+
+def _exists(db: Session, cid: int) -> Companion:
+    c = db.query(Companion).filter(Companion.id == cid).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="搭子不存在")
+    return c
+
+
+@router.get("/companions/{cid}/affinity")
+def get_affinity(cid: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """当前用户与该搭子的亲密度（共同养成里"我和它有多熟"）。"""
+    _exists(db, cid)
+    row = (db.query(CompanionAffinity)
+           .filter(CompanionAffinity.companion_id == cid, CompanionAffinity.user_id == user.id).first())
+    if not row:
+        return {"points": 0, "level": 1, "level_min": 0, "level_max": 50}
+    return row.public_dict()
+
+
+@router.get("/companions/{cid}/milestones")
+def get_milestones(cid: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    _exists(db, cid)
+    rows = (db.query(CompanionMilestone).filter(CompanionMilestone.companion_id == cid)
+            .order_by(CompanionMilestone.created_at.asc()).all())
+    return {"milestones": [m.public_dict() for m in rows]}
+
+
+# ---------- K：成长动态 + 传承家谱 ----------
+
+@router.get("/companions/{cid}/diary")
+def get_diary(cid: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    _exists(db, cid)
+    rows = (db.query(CompanionDiary).filter(CompanionDiary.companion_id == cid)
+            .order_by(CompanionDiary.created_at.desc()).limit(50).all())
+    return {"diary": [d.public_dict() for d in rows]}
+
+
+@router.get("/companions/{cid}/lineage")
+def get_lineage(cid: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """传承家谱：从本搭子认领的快照回溯历代发布者，形成传承链。"""
+    c = _exists(db, cid)
+    chain = [{"name": c.name, "publisher_name": None, "is_current": True}]
+    snap_id = c.forked_from_snapshot_id
+    guard = 0
+    while snap_id and guard < 20:
+        snap = db.query(CompanionSnapshot).filter(CompanionSnapshot.id == snap_id).first()
+        if not snap:
+            break
+        chain.append({"name": snap.name, "publisher_name": snap.publisher_name, "is_current": False})
+        snap_id = snap.parent_snapshot_id
+        guard += 1
+    return {"lineage": chain, "depth": len(chain) - 1}

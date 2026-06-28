@@ -50,6 +50,46 @@ struct Memory: Codable, Identifiable, Hashable {
     let created_at: String
 }
 
+/// 我与搭子的亲密度。
+struct AffinityDTO: Codable, Hashable {
+    let points: Int
+    let level: Int
+    let level_min: Int
+    let level_max: Int
+    var progress: Double {
+        let span = max(1, level_max - level_min)
+        return min(1, max(0, Double(points - level_min) / Double(span)))
+    }
+}
+
+/// 搭子里程碑/纪念。
+struct MilestoneDTO: Codable, Identifiable, Hashable {
+    let id: Int
+    let kind: String
+    let content: String
+    let created_at: String
+    var day: String { String(created_at.prefix(10)) }
+}
+
+/// 搭子成长日记/动态。
+struct DiaryDTO: Codable, Identifiable, Hashable {
+    let id: Int
+    let content: String
+    let created_at: String
+    var day: String { String(created_at.prefix(10)) }
+}
+
+/// 传承家谱节点。
+struct LineageNode: Codable, Hashable {
+    let name: String
+    let publisher_name: String?
+    let is_current: Bool
+}
+struct LineageDTO: Codable, Hashable {
+    let lineage: [LineageNode]
+    let depth: Int
+}
+
 /// 可选的头像配色（创建搭子时用）。
 enum CompanionTint: String, CaseIterable, Identifiable {
     case teal, sage, tealDark, ink, gray
