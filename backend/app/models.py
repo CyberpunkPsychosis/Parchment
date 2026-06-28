@@ -464,3 +464,18 @@ class Report(Base):
     target_id = Column(Integer, nullable=False)
     reason = Column(String, nullable=False, default="")
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class AssistantMessage(Base):
+    """羊皮纸助手的对话历史（每个用户一条时间线，持久化、可清空）。"""
+    __tablename__ = "assistant_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, index=True, nullable=False)
+    role = Column(String, nullable=False, default="user")  # user | assistant
+    content = Column(String, nullable=False, default="")
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    def public_dict(self) -> dict:
+        return {"id": self.id, "role": self.role, "content": self.content,
+                "created_at": self.created_at.isoformat()}

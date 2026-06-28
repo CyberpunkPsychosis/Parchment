@@ -9,6 +9,13 @@ struct AssistantProposal: Codable, Hashable {
     var conversation_title: String? = nil
 }
 
+/// 助手聊天记录的一条（后端持久化）。
+struct AssistantHistoryItem: Codable, Identifiable, Hashable {
+    let id: Int
+    let role: String          // user | assistant
+    let content: String
+}
+
 /// 助手面板里的一条记录。
 private struct AssistantMsg: Identifiable {
     let id = UUID()
@@ -26,6 +33,10 @@ struct AssistantView: View {
     @State private var msgs: [AssistantMsg] = []
     @State private var draft = ""
     @State private var busy = false
+    @State private var voiceMode = false
+    @State private var transcribing = false
+    @State private var showClearConfirm = false
+    @StateObject private var recorder = AudioRecorder()
 
     var body: some View {
         ZStack {
@@ -47,6 +58,13 @@ struct AssistantView: View {
                 }
                 inputBar
             }
+            VoiceRecordingHUD(recorder: recorder)
+        }
+        .animation(.easeOut(duration: 0.15), value: recorder.isRecording)
+        .task { await loadHistory() }
+        .alert(loc.t("assistant.clearConfirm"), isPresented: $showClearConfirm) {
+            Button(loc.t("assistant.clearHistory"), role: .destructive) { clearHistory() }
+            Button(loc.t("common.cancel"), role: .cancel) {}
         }
     }
 
@@ -55,6 +73,11 @@ struct AssistantView: View {
             Image(systemName: "sparkles").foregroundStyle(FlowTheme.teal)
             Text(loc.t("quick.aiName")).font(FlowTheme.heading(18)).foregroundStyle(FlowTheme.ink)
             Spacer()
+            if !msgs.isEmpty {
+                Button { showClearConfirm = true } label: {
+                    Image(systemName: "trash").foregroundStyle(FlowTheme.gray)
+                }
+            }
             Button { dismiss() } label: { Image(systemName: "xmark").foregroundStyle(FlowTheme.gray) }
         }
         .padding(.horizontal, 18).padding(.vertical, 14)
@@ -119,15 +142,57 @@ struct AssistantView: View {
 
     private var inputBar: some View {
         HStack(spacing: 10) {
-            TextField(loc.t("assistant.placeholder"), text: $draft).font(FlowTheme.body(15)).onSubmit { send() }
-                .padding(.horizontal, 16).padding(.vertical, 11)
-                .background(RoundedRectangle(cornerRadius: 22).fill(Color.white.opacity(0.9)))
-                .sketchBorder(22, width: 1.4, seed: 42)
-            Button { send() } label: { PillButton(title: loc.t("chat.send"), radius: 22, seed: 41) }
-                .disabled(busy || draft.trimmingCharacters(in: .whitespaces).isEmpty)
+            // 语音/键盘切换（微信式，长按说话→转文字→发给助手）
+            Button { voiceMode.toggle() } label: {
+                Image(systemName: voiceMode ? "keyboard" : "waveform")
+                    .font(.system(size: 20)).foregroundStyle(FlowTheme.gray)
+            }
+            if voiceMode {
+                HoldToTalkBar(recorder: recorder, idleLabel: transcribing ? loc.t("voice.recognizing") : loc.t("voice.hold")) { url, secs in
+                    transcribeAndSend(url: url)
+                }
+            } else {
+                TextField(loc.t("assistant.placeholder"), text: $draft).font(FlowTheme.body(15)).onSubmit { send() }
+                    .padding(.horizontal, 16).padding(.vertical, 11)
+                    .background(RoundedRectangle(cornerRadius: 22).fill(Color.white.opacity(0.9)))
+                    .sketchBorder(22, width: 1.4, seed: 42)
+                Button { send() } label: { PillButton(title: loc.t("chat.send"), radius: 22, seed: 41) }
+                    .disabled(busy || draft.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
         }
         .padding(.horizontal, 14).padding(.vertical, 10)
         .background(FlowTheme.card.overlay(Rectangle().fill(FlowTheme.stroke).frame(height: 1), alignment: .top))
+    }
+
+    /// 把录音转成文字，自动作为一句话发给助手。
+    private func transcribeAndSend(url: URL) {
+        transcribing = true
+        Task {
+            let text = await SpeechTranscriber.transcribe(url)
+            try? FileManager.default.removeItem(at: url)
+            await MainActor.run {
+                transcribing = false
+                if let text, !text.trimmingCharacters(in: .whitespaces).isEmpty {
+                    draft = text
+                    send()
+                }
+            }
+        }
+    }
+
+    /// 进入时载入持久化的助手聊天记录。
+    private func loadHistory() async {
+        guard msgs.isEmpty else { return }
+        let items = (try? await APIClient.shared.assistantHistory()) ?? []
+        await MainActor.run {
+            msgs = items.map { AssistantMsg(mine: $0.role == "user", text: $0.content) }
+        }
+    }
+
+    /// 清空助手聊天记录（本地 + 后端）。
+    private func clearHistory() {
+        msgs = []
+        Task { try? await APIClient.shared.clearAssistantHistory() }
     }
 
     private func send() {

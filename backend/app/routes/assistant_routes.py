@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from ..deps import get_current_user
 from ..db import get_db
 from ..models import (User, Conversation, ConversationMember, Message, Post, Group, GroupMember,
-                      Companion, Memory)
+                      Companion, Memory, AssistantMessage)
 from ..providers import complete_chat
 from ..usage import consume
 from .messaging_routes import conv_dict, serialize_message
@@ -139,15 +139,40 @@ def _parse_json(raw: str) -> dict:
         return {}
 
 
+def _history(db: Session, uid: int, limit: int = 10) -> list[dict]:
+    """取该用户最近的助手对话（最旧在前），给模型做多轮上下文。"""
+    rows = (db.query(AssistantMessage).filter(AssistantMessage.user_id == uid)
+            .order_by(AssistantMessage.id.desc()).limit(limit).all())[::-1]
+    return [{"role": m.role, "content": m.content} for m in rows]
+
+
+def _save(db: Session, uid: int, role: str, content: str) -> None:
+    content = (content or "").strip()
+    if not content:
+        return
+    db.add(AssistantMessage(user_id=uid, role=role, content=content))
+    db.commit()
+
+
 @router.post("/assistant/act")
 async def act(body: ActIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     consume(db, user)
+    # 多轮上下文 + 聊天记录：先取历史，落本轮 user 文本，分派出结果后再落助手回复
+    hist = _history(db, user.id)
+    _save(db, user.id, "user", body.text)
+    resp = await _dispatch(db, user, body, hist)
+    _save(db, user.id, "assistant", resp.get("say", ""))
+    return resp
+
+
+async def _dispatch(db: Session, user: User, body: ActIn, hist: list[dict]) -> dict:
     tier = "pro" if user.is_pro else "free"
     voice = _assistant_voice(db, user.id)   # 用"用户养的搭子"的口吻
     convs = _my_conversations(db, user.id)
     conv_names = "、".join(c["title"] for c in convs) or "（暂无会话）"
-    raw = await complete_chat(tier, [{"role": "user", "content": body.text}],
-                              system=_SYS % conv_names)
+    convo = hist + [{"role": "user", "content": body.text}]   # 历史 + 本轮，让指代可解析
+
+    raw = await complete_chat(tier, convo, system=_SYS % conv_names)
     plan = _parse_json(raw)
     action = plan.get("action")
     say = (plan.get("say") or "").strip()
@@ -237,7 +262,22 @@ async def act(body: ActIn, user: User = Depends(get_current_user), db: Session =
                 "conversation_title": target["title"], "content": msg,
                 "say": f"我查好了，准备发到【{target['title']}】："}
 
-    # 默认：直接回答（用搭子的口吻）
-    answer = await complete_chat(tier, [{"role": "user", "content": body.text}],
-                                 system=voice, temperature=0.9)
+    # 默认：直接回答（用搭子的口吻，带多轮上下文）
+    answer = await complete_chat(tier, convo, system=voice, temperature=0.9)
     return {"kind": "answer", "say": answer.strip() or say or "嗯，我在听～"}
+
+
+@router.get("/assistant/history")
+def assistant_history(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """助手聊天记录（最旧在前）。"""
+    rows = (db.query(AssistantMessage).filter(AssistantMessage.user_id == user.id)
+            .order_by(AssistantMessage.id.asc()).all())
+    return {"messages": [m.public_dict() for m in rows]}
+
+
+@router.delete("/assistant/history")
+def clear_assistant_history(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """清空助手聊天记录。"""
+    db.query(AssistantMessage).filter(AssistantMessage.user_id == user.id).delete()
+    db.commit()
+    return {"ok": True}

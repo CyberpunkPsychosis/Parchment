@@ -32,6 +32,7 @@ struct ConversationView: View {
     @State private var showBgPicker = false
     @State private var showMemories = false
     @State private var editCompanion: Companion?
+    @State private var voiceMode = false
 
     private var myId: Int? { auth.user?.id }
     private var aiMembers: [ConvMemberDTO] { members.filter { $0.is_ai } }
@@ -96,6 +97,8 @@ struct ConversationView: View {
             }
         }
         .animation(.spring(response: 0.4), value: levelUpToast)
+        .overlay { VoiceRecordingHUD(recorder: recorder) }
+        .animation(.easeOut(duration: 0.15), value: recorder.isRecording)
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .task { await load() }
@@ -231,9 +234,8 @@ struct ConversationView: View {
         }
     }
 
-    /// 松开麦克风：停止录音→上传→发送语音消息。
-    private func finishRecording() {
-        guard let (url, secs) = recorder.stop() else { return }
+    /// 上传并发送一条语音消息（录音已由 HoldToTalkBar 停止）。
+    private func sendVoice(url: URL, secs: Int) {
         Task {
             guard let data = try? Data(contentsOf: url) else { return }
             if let remote = try? await APIClient.shared.uploadAudio(data),
@@ -411,28 +413,29 @@ struct ConversationView: View {
     private var inputBar: some View {
         VStack(spacing: 0) {
             if let r = replyingTo { replyingBanner(r) }
-            if recorder.isRecording { recordingBanner }
             HStack(spacing: 10) {
                 PhotosPicker(selection: $photoItem, matching: .images) {
                     Image(systemName: "photo").font(.system(size: 20)).foregroundStyle(FlowTheme.gray)
                 }
-                // 长按麦克风录音，松手发送
-                Image(systemName: recorder.isRecording ? "mic.fill" : "mic")
-                    .font(.system(size: 20)).foregroundStyle(recorder.isRecording ? FlowTheme.teal : FlowTheme.gray)
-                    .scaleEffect(recorder.isRecording ? 1.2 : 1)
-                    .gesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { _ in if !recorder.isRecording { recorder.start() } }
-                            .onEnded { _ in finishRecording() }
-                    )
-                HStack {
-                    TextField(loc.t("chat.placeholder"), text: $draft).font(FlowTheme.body(15)).onSubmit { send() }
+                // 语音/键盘切换（微信式）
+                Button { voiceMode.toggle() } label: {
+                    Image(systemName: voiceMode ? "keyboard" : "waveform")
+                        .font(.system(size: 20)).foregroundStyle(FlowTheme.gray)
                 }
-                .padding(.horizontal, 16).padding(.vertical, 11)
-                .background(RoundedRectangle(cornerRadius: 22).fill(Color.white.opacity(0.9)))
-                .sketchBorder(22, width: 1.4, seed: 42)
+                if voiceMode {
+                    HoldToTalkBar(recorder: recorder, idleLabel: loc.t("voice.hold")) { url, secs in
+                        sendVoice(url: url, secs: secs)
+                    }
+                } else {
+                    HStack {
+                        TextField(loc.t("chat.placeholder"), text: $draft).font(FlowTheme.body(15)).onSubmit { send() }
+                    }
+                    .padding(.horizontal, 16).padding(.vertical, 11)
+                    .background(RoundedRectangle(cornerRadius: 22).fill(Color.white.opacity(0.9)))
+                    .sketchBorder(22, width: 1.4, seed: 42)
 
-                Button { send() } label: { PillButton(title: loc.t("chat.send"), radius: 22, seed: 41) }
+                    Button { send() } label: { PillButton(title: loc.t("chat.send"), radius: 22, seed: 41) }
+                }
             }
             .padding(.horizontal, 14).padding(.vertical, 10)
         }
@@ -456,16 +459,6 @@ struct ConversationView: View {
         .background(FlowTheme.parchment)
     }
 
-    private var recordingBanner: some View {
-        HStack(spacing: 8) {
-            Circle().fill(.red).frame(width: 8, height: 8)
-            Text("\(loc.t("chat.recording")) \(Int(recorder.elapsed))s").font(FlowTheme.caption(12)).foregroundStyle(FlowTheme.ink)
-            Spacer()
-            Text(loc.t("chat.releaseToSend")).font(FlowTheme.caption(11)).foregroundStyle(FlowTheme.gray)
-        }
-        .padding(.horizontal, 16).padding(.vertical, 8)
-        .background(FlowTheme.parchment)
-    }
 }
 
 /// 转发目标选择器：选一个会话把消息转过去。

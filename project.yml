@@ -27,6 +27,8 @@ targets:
           - UIInterfaceOrientationPortrait
         # 语音消息录制需要麦克风权限
         NSMicrophoneUsageDescription: "录制语音消息需要使用麦克风"
+        # 羊皮纸助手把语音指令转成文字需要语音识别
+        NSSpeechRecognitionUsageDescription: "把你对助手说的话转成文字，需要使用语音识别"
         # 本地开发：允许连本机 HTTP 后端（localhost）。上线走 HTTPS 时可移除。
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true

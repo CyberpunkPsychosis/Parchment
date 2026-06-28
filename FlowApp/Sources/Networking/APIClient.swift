@@ -371,6 +371,19 @@ final class APIClient {
         return try await send(req, as: AssistantProposal.self)
     }
 
+    /// 助手聊天记录（最旧在前）。
+    func assistantHistory() async throws -> [AssistantHistoryItem] {
+        struct R: Decodable { let messages: [AssistantHistoryItem] }
+        let req = try makeRequest("/assistant/history", method: "GET")
+        return try await send(req, as: R.self).messages
+    }
+
+    /// 清空助手聊天记录。
+    func clearAssistantHistory() async throws {
+        let req = try makeRequest("/assistant/history", method: "DELETE")
+        _ = try await URLSession.shared.data(for: req)
+    }
+
     /// 打开（或创建）与某搭子的 1:1 持久化会话。
     func openCompanionConversation(companionId: Int) async throws -> ConversationDTO {
         let req = try makeRequest("/conversations/companion", method: "POST", body: ["companion_id": companionId])
