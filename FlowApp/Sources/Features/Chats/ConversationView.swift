@@ -167,7 +167,7 @@ struct ConversationView: View {
             Button { dismiss() } label: {
                 Image(systemName: "chevron.left").font(.system(size: 18, weight: .semibold)).foregroundStyle(FlowTheme.ink)
             }
-            Avatar(initials: conversation.avatar, tint: conversation.tintColor, size: 38)
+            Avatar(initials: conversation.avatar, tint: conversation.tintColor, size: 38, imageURL: conversation.avatar_url)
             VStack(alignment: .leading, spacing: 2) {
                 Text(conversation.title).font(.system(size: 16, weight: .semibold)).foregroundStyle(FlowTheme.ink)
                 if conversation.is_group {
@@ -323,7 +323,7 @@ struct ConvBubble: View {
         HStack(alignment: .top, spacing: 8) {
             if mine { Spacer(minLength: 48) }
             if !mine {
-                let av = Avatar(initials: msg.sender_avatar, tint: msg.senderColor, size: 34)
+                let av = Avatar(initials: msg.sender_avatar, tint: msg.senderColor, size: 34, imageURL: msg.sender_avatar_url)
                 if let uid = msg.sender_user_id, !msg.is_ai {
                     Button { onAvatarTap?(uid) } label: { av }.buttonStyle(.plain)
                 } else { av }
@@ -412,7 +412,7 @@ struct GroupMembersView: View {
                 VStack(spacing: 10) {
                     ForEach(Array(members.enumerated()), id: \.element.id) { idx, m in
                         HStack(spacing: 11) {
-                            Avatar(initials: m.initials, tint: m.tintColor, size: 38, seed: UInt64(idx + 210))
+                            Avatar(initials: m.initials, tint: m.tintColor, size: 38, seed: UInt64(idx + 210), imageURL: m.avatar_url)
                             Text(m.name).font(.system(size: 15, weight: .semibold)).foregroundStyle(FlowTheme.ink)
                             if m.role == "owner" {
                                 Text(loc.t("community.owner")).font(.system(size: 10, weight: .bold)).foregroundStyle(.white)

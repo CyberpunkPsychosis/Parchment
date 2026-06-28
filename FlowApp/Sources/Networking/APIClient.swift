@@ -6,6 +6,8 @@ struct AppUser: Codable, Equatable {
     let id: Int
     let email: String
     var nickname: String
+    var avatar_url: String?
+    var bio: String?
     var tier: String          // "free" | "pro"
     var tier_expiry: String?
     var auto_send_stickers: Bool?   // null=首次未选
@@ -188,10 +190,12 @@ final class APIClient {
         _ = try await URLSession.shared.data(for: req)
     }
 
-    func updateSettings(autoSendStickers: Bool? = nil, nickname: String? = nil) async throws -> AppUser {
-        struct Body: Encodable { let auto_send_stickers: Bool?; let nickname: String? }
+    func updateSettings(autoSendStickers: Bool? = nil, nickname: String? = nil,
+                        avatarURL: String? = nil, bio: String? = nil) async throws -> AppUser {
+        struct Body: Encodable { let auto_send_stickers: Bool?; let nickname: String?; let avatar_url: String?; let bio: String? }
         let req = try makeRequest("/me/settings", method: "PATCH",
-                                  body: Body(auto_send_stickers: autoSendStickers, nickname: nickname))
+                                  body: Body(auto_send_stickers: autoSendStickers, nickname: nickname,
+                                             avatar_url: avatarURL, bio: bio))
         return try await send(req, as: AppUser.self)
     }
 

@@ -8,24 +8,29 @@ struct ConversationDTO: Codable, Identifiable, Hashable {
     let group_id: Int?
     let title: String
     let avatar: String
+    var avatar_url: String?
     let tint: String
     let is_group: Bool
     let member_count: Int
+    var member_cap: Int?
+    var announcement: String?
     let preview: String
     let time: String          // ISO8601
     var unread: Int
+    var pinned: Bool?
+    var muted: Bool?
 
     var tintColor: Color { FlowTheme.tint(tint) }
 
     var shortTime: String {
-        // 后端给的是 ISO（含 "T"）；取 HH:mm 简单展示
         if let t = time.split(separator: "T").last { return String(t.prefix(5)) }
         return ""
     }
 
     var asSummary: ChatSummary {
         ChatSummary(name: title, initials: avatar, tint: tintColor,
-                    preview: preview, time: shortTime, unread: unread, isGroup: is_group)
+                    preview: preview, time: shortTime, unread: unread, isGroup: is_group,
+                    imageURL: avatar_url)
     }
 }
 
@@ -39,6 +44,7 @@ struct MessageDTO: Codable, Identifiable, Hashable {
     let companion_id: Int?
     let sender_name: String
     let sender_avatar: String
+    var sender_avatar_url: String?
     let sender_tint: String
     let is_ai: Bool
 
@@ -57,6 +63,7 @@ struct ConvMemberDTO: Codable, Identifiable, Hashable {
     let initials: String
     let tint: String
     var role: String? = nil
+    var avatar_url: String? = nil
 
     var id: String { is_ai ? "c\(companion_id ?? 0)" : "u\(user_id ?? 0)" }
     var tintColor: Color { FlowTheme.tint(tint) }

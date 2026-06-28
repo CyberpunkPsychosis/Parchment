@@ -6,6 +6,7 @@ struct ProfileView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showPaywall = false
     @State private var showStickers = false
+    @State private var showEdit = false
 
     private var initials: String {
         let name = auth.user?.nickname ?? "U"
@@ -18,6 +19,7 @@ struct ProfileView: View {
             ScrollView {
                 VStack(spacing: 18) {
                     profileCard
+                    editEntry
                     stickersEntry
                     settingsCard
                     if let user = auth.user, !user.isPro {
@@ -40,6 +42,24 @@ struct ProfileView: View {
         .sheet(isPresented: $showStickers) {
             StickerPanelView().environmentObject(loc).environmentObject(auth)
         }
+        .sheet(isPresented: $showEdit) {
+            EditProfileView().environmentObject(loc).environmentObject(auth)
+        }
+    }
+
+    private var editEntry: some View {
+        Button { showEdit = true } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "square.and.pencil").font(.system(size: 20)).foregroundStyle(FlowTheme.tealDark)
+                Text(loc.t("profile.edit")).font(FlowTheme.body(16)).foregroundStyle(FlowTheme.ink)
+                Spacer()
+                Image(systemName: "chevron.right").foregroundStyle(FlowTheme.gray)
+            }
+            .padding(18)
+            .background(RoundedRectangle(cornerRadius: 20).fill(FlowTheme.card))
+            .sketchBorder(20, width: 1.4, seed: 10)
+        }
+        .buttonStyle(.plain)
     }
 
     private var stickersEntry: some View {
@@ -60,7 +80,7 @@ struct ProfileView: View {
     private var profileCard: some View {
         Card {
             VStack(spacing: 18) {
-                Avatar(initials: initials, tint: FlowTheme.teal, size: 84, seed: 7)
+                Avatar(initials: initials, tint: FlowTheme.teal, size: 84, seed: 7, imageURL: auth.user?.avatar_url)
                     .padding(.top, 20)
 
                 VStack(spacing: 5) {
@@ -72,6 +92,10 @@ struct ProfileView: View {
                             .foregroundStyle(auth.isPro ? FlowTheme.teal : FlowTheme.gray)
                         Text(loc.t(auth.isPro ? "auth.member.pro" : "auth.member.free"))
                             .font(FlowTheme.caption(13)).foregroundStyle(auth.isPro ? FlowTheme.teal : FlowTheme.gray)
+                    }
+                    if let bio = auth.user?.bio, !bio.isEmpty {
+                        Text(bio).font(FlowTheme.caption(13)).foregroundStyle(FlowTheme.gray)
+                            .multilineTextAlignment(.center).padding(.top, 2)
                     }
                 }
 

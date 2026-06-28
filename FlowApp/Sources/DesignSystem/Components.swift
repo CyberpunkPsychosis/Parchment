@@ -105,16 +105,26 @@ struct Avatar: View {
     var tint: Color = FlowTheme.teal
     var size: CGFloat = 44
     var seed: UInt64 = 3
+    var imageURL: String? = nil
+
     var body: some View {
-        Circle().fill(tint.opacity(0.16))
-            .overlay(
-                Text(initials)
-                    .font(.system(size: size * 0.4, weight: .semibold, design: .serif))
-                    .foregroundStyle(tint)
-            )
-            .frame(width: size, height: size)
-            .overlay(SketchyRoundedRect(cornerRadius: size / 2, jitter: 0.8, seed: seed)
-                .stroke(tint.opacity(0.6), lineWidth: 1.3))
+        Group {
+            if let s = imageURL, let url = URL(string: s), !s.isEmpty {
+                AsyncImage(url: url) { img in
+                    img.resizable().scaledToFill()
+                } placeholder: {
+                    Circle().fill(tint.opacity(0.16))
+                        .overlay(Text(initials).font(.system(size: size * 0.4, weight: .semibold, design: .serif)).foregroundStyle(tint))
+                }
+            } else {
+                Circle().fill(tint.opacity(0.16))
+                    .overlay(Text(initials).font(.system(size: size * 0.4, weight: .semibold, design: .serif)).foregroundStyle(tint))
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(Circle())
+        .overlay(SketchyRoundedRect(cornerRadius: size / 2, jitter: 0.8, seed: seed)
+            .stroke(tint.opacity(0.6), lineWidth: 1.3))
     }
 }
 

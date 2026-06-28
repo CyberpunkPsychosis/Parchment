@@ -72,7 +72,7 @@ struct ContactsView: View {
                             ForEach(Array(friends.enumerated()), id: \.element.id) { idx, f in
                                 Button { openDM(f) } label: {
                                     HStack(spacing: 11) {
-                                        Avatar(initials: f.initials, tint: f.tintColor, size: 40, seed: UInt64(idx + 80))
+                                        Avatar(initials: f.initials, tint: f.tintColor, size: 40, seed: UInt64(idx + 80), imageURL: f.avatar_url)
                                         Text(f.nickname).font(.system(size: 15, weight: .semibold)).foregroundStyle(FlowTheme.ink)
                                         Spacer()
                                         Image(systemName: "bubble.left").font(.system(size: 14)).foregroundStyle(FlowTheme.gray)
@@ -144,7 +144,7 @@ struct AddFriendView: View {
                 VStack(spacing: 8) {
                     ForEach(Array(results.enumerated()), id: \.element.id) { idx, u in
                         HStack(spacing: 11) {
-                            Avatar(initials: u.initials, tint: u.tintColor, size: 40, seed: UInt64(idx + 110))
+                            Avatar(initials: u.initials, tint: u.tintColor, size: 40, seed: UInt64(idx + 110), imageURL: u.avatar_url)
                             Text(u.nickname).font(.system(size: 15, weight: .semibold)).foregroundStyle(FlowTheme.ink)
                             Spacer()
                             actionButton(u)

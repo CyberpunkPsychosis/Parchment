@@ -17,7 +17,10 @@ struct UserProfileView: View {
             ScrollView {
                 VStack(spacing: 16) {
                     if let u = user {
-                        Avatar(initials: u.initials, tint: u.tintColor, size: 84, seed: 7).padding(.top, 24)
+                        Avatar(initials: u.initials, tint: u.tintColor, size: 84, seed: 7, imageURL: u.avatar_url).padding(.top, 24)
+                        if let bio = u.bio, !bio.isEmpty {
+                            Text(bio).font(FlowTheme.caption(13)).foregroundStyle(FlowTheme.gray).multilineTextAlignment(.center).padding(.horizontal, 30)
+                        }
                         Text(u.nickname).font(FlowTheme.heading(22)).foregroundStyle(FlowTheme.ink)
 
                         if !u.is_me {

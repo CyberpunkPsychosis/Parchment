@@ -103,7 +103,7 @@ struct ChatRowView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Avatar(initials: chat.initials, tint: chat.tint, size: 46)
+            Avatar(initials: chat.initials, tint: chat.tint, size: 46, imageURL: chat.imageURL)
             VStack(alignment: .leading, spacing: 3) {
                 Text(chat.name)
                     .font(.system(size: 16, weight: .semibold))

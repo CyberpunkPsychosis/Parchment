@@ -16,6 +16,7 @@ struct ChatSummary: Identifiable, Hashable {
     let time: String
     let unread: Int
     let isGroup: Bool
+    var imageURL: String? = nil
 }
 
 enum MessageKind: Hashable {

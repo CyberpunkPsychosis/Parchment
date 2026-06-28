@@ -5,6 +5,7 @@ struct MomentPost: Codable, Identifiable, Hashable {
     let author_id: Int
     let author_name: String
     let author_initials: String
+    var author_avatar_url: String?
     let content: String
     let image_url: String?
     let created_at: String

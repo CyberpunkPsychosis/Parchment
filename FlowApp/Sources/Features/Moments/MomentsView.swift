@@ -43,7 +43,7 @@ struct MomentsView: View {
         Card(seed: seed) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 11) {
-                    Avatar(initials: p.author_initials, tint: FlowTheme.tint(["teal","sage","tealDark","ink","gray"][p.author_id % 5]), size: 40, seed: seed)
+                    Avatar(initials: p.author_initials, tint: FlowTheme.tint(["teal","sage","tealDark","ink","gray"][p.author_id % 5]), size: 40, seed: seed, imageURL: p.author_avatar_url)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(p.author_name).font(.system(size: 15, weight: .semibold)).foregroundStyle(FlowTheme.ink)
                         Text(p.shortTime).font(FlowTheme.caption(11)).foregroundStyle(FlowTheme.gray)

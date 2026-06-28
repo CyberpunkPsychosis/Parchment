@@ -60,6 +60,12 @@ final class AuthStore: ObservableObject {
         Task { if let u = try? await APIClient.shared.updateSettings(autoSendStickers: on) { user = u } }
     }
 
+    func updateProfile(nickname: String?, avatarURL: String?, bio: String?) async {
+        if let u = try? await APIClient.shared.updateSettings(nickname: nickname, avatarURL: avatarURL, bio: bio) {
+            user = u
+        }
+    }
+
     private func apply(_ res: AuthResponse) {
         Keychain.save(res.token)
         APIClient.shared.token = res.token
