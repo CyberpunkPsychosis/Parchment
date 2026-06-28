@@ -12,6 +12,7 @@ struct CompanionsView: View {
     @State private var editTarget: Companion?
     @State private var chatRoute: ConversationDTO?
     @State private var opening = false
+    @State private var deleteTarget: Companion?
 
     var body: some View {
         NavigationStack {
@@ -37,7 +38,7 @@ struct CompanionsView: View {
                                     Button { publishTarget = c } label: {
                                         Label(loc.t("publish.menu"), systemImage: "square.and.arrow.up")
                                     }
-                                    Button(role: .destructive) { delete(c) } label: {
+                                    Button(role: .destructive) { deleteTarget = c } label: {
                                         Label(loc.t("companion.delete"), systemImage: "trash")
                                     }
                                 }
@@ -71,6 +72,13 @@ struct CompanionsView: View {
         .task { await load() }
         .onReceive(NotificationCenter.default.publisher(for: .flowCompanionsChanged)) { _ in
             Task { await load() }
+        }
+        .alert(loc.t("companion.deleteConfirm"),
+               isPresented: Binding(get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } })) {
+            Button(loc.t("companion.delete"), role: .destructive) { if let c = deleteTarget { delete(c) } }
+            Button(loc.t("common.cancel"), role: .cancel) {}
+        } message: {
+            Text(loc.t("companion.deleteMsg"))
         }
     }
 

@@ -13,6 +13,7 @@ struct MarketItem: Codable, Identifiable, Hashable {
     let adopt_count: Int
     let memory_count: Int
     let is_mine: Bool
+    var already_adopted: Bool = false   // 当前用户是否已认领过这只
     var memories: [String]? = nil   // 仅详情接口返回（预览前几条）
     var hidden_count: Int? = nil    // 还有多少条认领后才能发现
 

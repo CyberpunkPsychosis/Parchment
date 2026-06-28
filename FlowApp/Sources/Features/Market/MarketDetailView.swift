@@ -10,6 +10,7 @@ struct MarketDetailView: View {
     @State private var detail: MarketItem?
     @State private var adopting = false
     @State private var done = false
+    @State private var showDupConfirm = false
 
     var body: some View {
         ZStack {
@@ -58,7 +59,9 @@ struct MarketDetailView: View {
                         .padding(.horizontal, 16)
                     }
 
-                    Button(action: adopt) {
+                    Button {
+                        if (detail ?? item).already_adopted { showDupConfirm = true } else { adopt() }
+                    } label: {
                         ZStack {
                             PrimaryButton(title: loc.t(done ? "market.adopted" : "market.adopt"))
                                 .opacity(adopting || done ? 0.6 : 1)
@@ -81,6 +84,10 @@ struct MarketDetailView: View {
         }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
+        .alert(loc.t("market.dupTitle"), isPresented: $showDupConfirm) {
+            Button(loc.t("market.dupAgain"), role: .destructive) { adopt() }
+            Button(loc.t("common.cancel"), role: .cancel) {}
+        } message: { Text(loc.t("market.dupMsg")) }
         .task { detail = try? await APIClient.shared.marketDetail(id: item.id) }
     }
 

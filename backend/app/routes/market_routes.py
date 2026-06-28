@@ -14,6 +14,20 @@ def _snap_mem_count(db: Session, sid: int) -> int:
     return db.query(SnapshotMemory).filter(SnapshotMemory.snapshot_id == sid).count()
 
 
+# 发布门槛：搭子需养到一定记忆量才能上市场（防止市场充斥空白搭子，约一周起步量）
+MIN_PUBLISH_MEMORIES = 8
+
+
+@router.get("/companions/{cid}/publish-eligibility")
+def publish_eligibility(cid: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """发布资格：当前记忆数 / 门槛 / 是否可发布。"""
+    c = db.query(Companion).filter(Companion.id == cid, Companion.owner_id == user.id).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="搭子不存在")
+    total = db.query(Memory).filter(Memory.companion_id == cid).count()
+    return {"memory_count": total, "required": MIN_PUBLISH_MEMORIES, "can_publish": total >= MIN_PUBLISH_MEMORIES}
+
+
 @router.post("/companions/{cid}/publish")
 def publish(cid: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """把搭子发布为可认领快照。仅打包 visibility=shareable 的记忆。"""
@@ -21,8 +35,15 @@ def publish(cid: int, user: User = Depends(get_current_user), db: Session = Depe
     if not c:
         raise HTTPException(status_code=404, detail="搭子不存在")
 
+    total_mem = db.query(Memory).filter(Memory.companion_id == cid).count()
+    if total_mem < MIN_PUBLISH_MEMORIES:
+        raise HTTPException(status_code=400,
+                            detail=f"搭子还太年轻，多陪它聊聊、攒到至少 {MIN_PUBLISH_MEMORIES} 条记忆再发布吧（现在 {total_mem} 条）")
+
     shareable = db.query(Memory).filter(Memory.companion_id == cid,
                                         Memory.visibility == "shareable").all()
+    if not shareable:
+        raise HTTPException(status_code=400, detail="至少勾选 1 条要分享的记忆再发布")
 
     # 传承：若该搭子是认领来的，新快照接在其来源快照之后
     depth = 0
@@ -67,11 +88,17 @@ def unpublish(sid: int, user: User = Depends(get_current_user), db: Session = De
     return {"ok": True}
 
 
+def _already_adopted(db: Session, uid: int, sid: int) -> bool:
+    return db.query(Companion).filter(Companion.owner_id == uid,
+                                      Companion.forked_from_snapshot_id == sid).first() is not None
+
+
 @router.get("/market")
 def market(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     rows = (db.query(CompanionSnapshot).filter(CompanionSnapshot.active == 1)
             .order_by(CompanionSnapshot.adopt_count.desc(), CompanionSnapshot.created_at.desc()).all())
-    return {"items": [s.public_dict(_snap_mem_count(db, s.id), s.publisher_id == user.id) for s in rows]}
+    return {"items": [s.public_dict(_snap_mem_count(db, s.id), s.publisher_id == user.id,
+                                    _already_adopted(db, user.id, s.id)) for s in rows]}
 
 
 _PREVIEW_N = 3  # 认领前只露几条做"钩子"，其余认领后聊天慢慢发现
@@ -84,7 +111,7 @@ def market_detail(sid: int, user: User = Depends(get_current_user), db: Session 
         raise HTTPException(status_code=404, detail="快照不存在")
     mems = db.query(SnapshotMemory).filter(SnapshotMemory.snapshot_id == sid).all()
     total = len(mems)
-    d = snap.public_dict(total, snap.publisher_id == user.id)
+    d = snap.public_dict(total, snap.publisher_id == user.id, _already_adopted(db, user.id, sid))
     # 仅预览前几条；其余隐藏，认领后通过对话发现
     d["memories"] = [m.content for m in mems[:_PREVIEW_N]]
     d["hidden_count"] = max(0, total - _PREVIEW_N)

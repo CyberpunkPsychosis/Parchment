@@ -303,7 +303,8 @@ final class APIClient {
 
     func publishCompanion(id: Int) async throws {
         let req = try makeRequest("/companions/\(id)/publish", method: "POST")
-        _ = try await URLSession.shared.data(for: req)
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        try Self.checkStatus(resp, data)   // 发布门槛不够会 400，抛出后端文案
     }
 
     // MARK: 群组广场

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from ..deps import get_current_user
 from ..db import get_db
 from ..models import (User, Companion, Memory, CompanionAffinity, CompanionMilestone,
-                      CompanionDiary, CompanionSnapshot)
+                      CompanionDiary, CompanionSnapshot, Conversation, ConversationMember, Message)
 
 router = APIRouter(tags=["companion"])
 
@@ -109,7 +109,20 @@ def update_companion(cid: int, body: CompanionPatch,
 @router.delete("/companions/{cid}")
 def delete_companion(cid: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     c = _owned(db, user, cid)
+    # 记忆 + 成长相关数据
     db.query(Memory).filter(Memory.companion_id == cid).delete()
+    db.query(CompanionAffinity).filter(CompanionAffinity.companion_id == cid).delete()
+    db.query(CompanionMilestone).filter(CompanionMilestone.companion_id == cid).delete()
+    db.query(CompanionDiary).filter(CompanionDiary.companion_id == cid).delete()
+    # 该搭子的 1:1 会话整条删除（消息 + 成员）；群里只摘除它的成员身份
+    conv_ids = [m.conversation_id for m in db.query(ConversationMember)
+                .filter(ConversationMember.companion_id == cid).all()]
+    for conv in db.query(Conversation).filter(Conversation.id.in_(conv_ids),
+                                              Conversation.type == "companion").all():
+        db.query(Message).filter(Message.conversation_id == conv.id).delete()
+        db.query(ConversationMember).filter(ConversationMember.conversation_id == conv.id).delete()
+        db.delete(conv)
+    db.query(ConversationMember).filter(ConversationMember.companion_id == cid).delete()
     db.delete(c)
     db.commit()
     return {"ok": True}

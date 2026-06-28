@@ -172,13 +172,15 @@ class CompanionSnapshot(Base):
     active = Column(Integer, nullable=False, default=1)    # 0=已下架
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
-    def public_dict(self, memory_count: int = 0, is_mine: bool = False) -> dict:
+    def public_dict(self, memory_count: int = 0, is_mine: bool = False,
+                    already_adopted: bool = False) -> dict:
         return {
             "id": self.id, "name": self.name, "persona": self.persona,
             "avatar": self.avatar, "tint": self.tint, "greeting": self.greeting,
             "publisher_name": self.publisher_name,
             "lineage_depth": self.lineage_depth, "adopt_count": self.adopt_count,
             "memory_count": memory_count, "is_mine": is_mine,
+            "already_adopted": already_adopted,
         }
 
 

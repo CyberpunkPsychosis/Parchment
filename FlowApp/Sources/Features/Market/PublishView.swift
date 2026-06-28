@@ -10,8 +10,11 @@ struct PublishView: View {
     @State private var loading = true
     @State private var publishing = false
     @State private var done = false
+    @State private var error: String?
 
+    private let minMemories = 8   // 与后端 MIN_PUBLISH_MEMORIES 保持一致
     private var shareableCount: Int { memories.filter { $0.visibility == "shareable" }.count }
+    private var enoughMemories: Bool { memories.count >= minMemories }
 
     var body: some View {
         ZStack {
@@ -39,15 +42,25 @@ struct PublishView: View {
                     }
                 }
 
+                if !loading && !enoughMemories {
+                    Text("\(loc.t("publish.gate"))（\(memories.count)/\(minMemories)）")
+                        .font(FlowTheme.caption(12)).foregroundStyle(FlowTheme.gray)
+                        .multilineTextAlignment(.center).padding(.horizontal, 24)
+                }
+                if let error {
+                    Text(error).font(FlowTheme.caption(12)).foregroundStyle(.red)
+                        .multilineTextAlignment(.center).padding(.horizontal, 24)
+                }
+
                 Button(action: publish) {
                     ZStack {
                         PrimaryButton(title: done ? loc.t("publish.done")
                                       : "\(loc.t("publish.cta"))（\(loc.t("publish.share"))\(shareableCount)）")
-                            .opacity(publishing ? 0.6 : 1)
+                            .opacity(publishing || !enoughMemories ? 0.5 : 1)
                         if publishing { ProgressView().tint(.white) }
                     }
                 }
-                .disabled(publishing || loading)
+                .disabled(publishing || loading || !enoughMemories)
                 .padding(.horizontal, 16).padding(.bottom, 8)
 
                 Text(loc.t("publish.privacyNote"))
@@ -101,13 +114,17 @@ struct PublishView: View {
     }
 
     private func publish() {
-        publishing = true
+        guard enoughMemories else { return }
+        publishing = true; error = nil
         Task {
-            try? await APIClient.shared.publishCompanion(id: companion.id)
-            done = true
-            try? await Task.sleep(nanoseconds: 800_000_000)
-            publishing = false
-            dismiss()
+            do {
+                try await APIClient.shared.publishCompanion(id: companion.id)
+                done = true
+                try? await Task.sleep(nanoseconds: 800_000_000)
+                await MainActor.run { publishing = false; dismiss() }
+            } catch {
+                await MainActor.run { self.error = error.localizedDescription; publishing = false }
+            }
         }
     }
 }
