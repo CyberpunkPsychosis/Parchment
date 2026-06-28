@@ -179,6 +179,44 @@ class GroupJoinRequest(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
+class Conversation(Base):
+    """统一会话：私聊 / 群聊 / 搭子。所有聊天都落在这里。"""
+    __tablename__ = "conversations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    type = Column(String, nullable=False, default="direct")  # direct | group | companion
+    group_id = Column(Integer, nullable=True, index=True)    # type=group 时关联 groups.id
+    title = Column(String, nullable=False, default="")       # 可选缓存标题
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow)  # 末条消息时间，用于排序
+
+
+class ConversationMember(Base):
+    """会话成员：可以是人(user_id)或 AI 搭子(companion_id)。"""
+    __tablename__ = "conversation_members"
+
+    id = Column(Integer, primary_key=True, index=True)
+    conversation_id = Column(Integer, index=True, nullable=False)
+    user_id = Column(Integer, index=True, nullable=True)        # 人类成员
+    companion_id = Column(Integer, index=True, nullable=True)   # AI 搭子成员（阶段 4）
+    role = Column(String, nullable=False, default="member")     # owner | member
+    last_read_at = Column(DateTime, nullable=True)              # 已读水位（算未读）
+    joined_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class Message(Base):
+    """带发送者身份的消息（支持多人 + AI 同框）。"""
+    __tablename__ = "messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    conversation_id = Column(Integer, index=True, nullable=False)
+    sender_user_id = Column(Integer, index=True, nullable=True)      # 人发的
+    sender_companion_id = Column(Integer, index=True, nullable=True) # AI 搭子发的
+    kind = Column(String, nullable=False, default="text")  # text|image|sticker|file|voice|system|companion
+    content = Column(String, nullable=False, default="")   # 文本 / URL / JSON
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
 class Sticker(Base):
     __tablename__ = "stickers"
 
