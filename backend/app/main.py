@@ -70,11 +70,11 @@ def _bootstrap_admin(db):
     print(f"[admin] 已创建管理员账号：{ADMIN_EMAIL}")
 
 
-# 种一个 demo 已发布搭子，让认领市场不空
+# demo 演示账号（环游的小云）已停用：不再注入 demo 市场搭子/社群
 _db = SessionLocal()
 try:
-    seed_demo_market(_db)
-    seed_demo_groups(_db)
+    # seed_demo_market(_db)   # 停用：不要 demo 用户及其市场搭子
+    # seed_demo_groups(_db)   # 停用：不要 demo 用户及其社群
     _bootstrap_admin(_db)
     # 首批假用户 + 朋友圈（仅首次；之后由每日滑入持续补充）
     try:
