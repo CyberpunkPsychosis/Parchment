@@ -314,7 +314,7 @@ def conversation_members(cid: int, user: User = Depends(get_current_user), db: S
         elif m.user_id:
             u = db.query(User).filter(User.id == m.user_id).first()
             name = u.nickname if u else "用户"
-            out.append({"is_ai": False, "user_id": m.user_id, "name": name,
+            out.append({"is_ai": False, "user_id": m.user_id, "name": name, "role": m.role,
                         "initials": _initials(name), "tint": _tint_for(m.user_id)})
     return {"members": out}
 
