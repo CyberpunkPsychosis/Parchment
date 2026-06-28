@@ -22,11 +22,14 @@ async def stream_chat_events(tier: str, messages: list[dict],
     pool = pool_for(tier)
 
     for idx, cfg in enumerate(pool):
-        url = f'{cfg["base_url"]}/chat/completions'
+        # chat_path 可覆盖默认路径；extra 可并入额外请求参数（如 MiniMax 的 thinking 开关）
+        url = f'{cfg["base_url"]}{cfg.get("chat_path", "/chat/completions")}'
         headers = {"Authorization": f'Bearer {cfg["api_key"]}', "Content-Type": "application/json"}
         payload = {"model": cfg["model"], "messages": full, "stream": True}
         if temperature is not None:
             payload["temperature"] = temperature
+        if isinstance(cfg.get("extra"), dict):
+            payload.update(cfg["extra"])
         try:
             async with httpx.AsyncClient(timeout=60.0, trust_env=False) as client:
                 async with client.stream("POST", url, headers=headers, json=payload) as resp:
