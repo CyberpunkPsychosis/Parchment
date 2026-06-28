@@ -313,6 +313,11 @@ def create_conversation(body: NewConversation,
 FRIEND_GROUP_CAP_DEFAULT = 500
 
 
+def tier_max(user: User) -> int:
+    """会员可建更大的群：免费 500 / 会员 2000。"""
+    return 2000 if user.is_pro else 500
+
+
 def _human_count(db: Session, cid: int) -> int:
     return db.query(ConversationMember).filter(
         ConversationMember.conversation_id == cid,
@@ -328,8 +333,9 @@ class NewFriendGroup(BaseModel):
 @router.post("/conversations/group")
 def create_friend_group(body: NewFriendGroup,
                         user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """好友内部群：不挂社群(group_id=None)，直接拉好友进会话。"""
-    cap = body.member_cap or FRIEND_GROUP_CAP_DEFAULT
+    """好友内部群：不挂社群(group_id=None)，直接拉好友进会话。上限按会员分档。"""
+    tmax = tier_max(user)
+    cap = min(body.member_cap or tmax, tmax)
     c = Conversation(type="group", title=body.name.strip() or "群聊", member_cap=cap)
     db.add(c); db.commit(); db.refresh(c)
     db.add(ConversationMember(conversation_id=c.id, user_id=user.id, role="owner"))

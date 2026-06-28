@@ -34,7 +34,7 @@ struct CompanionsView: View {
                             }
                             createButton
                         }
-                        .padding(.horizontal, 16).padding(.vertical, 14)
+                        .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 96)
                     }
                 }
             }

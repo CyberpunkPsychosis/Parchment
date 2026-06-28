@@ -11,6 +11,7 @@ struct CommunityDetailView: View {
     @State private var joining = false
     @State private var toast: String?
     @State private var route: ConversationDTO?
+    @State private var profileRef: UserRef?
 
     private var g: PlazaGroup { detail ?? group }
 
@@ -37,17 +38,22 @@ struct CommunityDetailView: View {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("\(loc.t("community.members"))（\(g.member_count)/\(g.member_cap)）")
                                 .font(FlowTheme.heading(16)).foregroundStyle(FlowTheme.ink)
-                            ForEach(g.members ?? [], id: \.name) { m in
-                                HStack(spacing: 10) {
-                                    Avatar(initials: m.initials, tint: FlowTheme.teal, size: 34)
-                                    Text(m.name).font(FlowTheme.body(15)).foregroundStyle(FlowTheme.ink)
-                                    if m.is_owner {
-                                        Text(loc.t("community.owner")).font(.system(size: 10, weight: .bold))
-                                            .foregroundStyle(.white).padding(.horizontal, 7).padding(.vertical, 3)
-                                            .background(Capsule().fill(FlowTheme.teal))
+                            ForEach(Array((g.members ?? []).enumerated()), id: \.offset) { _, m in
+                                Button {
+                                    if let uid = m.user_id { profileRef = UserRef(id: uid) }
+                                } label: {
+                                    HStack(spacing: 10) {
+                                        Avatar(initials: m.initials, tint: FlowTheme.teal, size: 34)
+                                        Text(m.name).font(FlowTheme.body(15)).foregroundStyle(FlowTheme.ink)
+                                        if m.is_owner {
+                                            Text(loc.t("community.owner")).font(.system(size: 10, weight: .bold))
+                                                .foregroundStyle(.white).padding(.horizontal, 7).padding(.vertical, 3)
+                                                .background(Capsule().fill(FlowTheme.teal))
+                                        }
+                                        Spacer()
+                                        if m.user_id != nil { Image(systemName: "chevron.right").font(.system(size: 11)).foregroundStyle(FlowTheme.gray) }
                                     }
-                                    Spacer()
-                                }
+                                }.buttonStyle(.plain)
                             }
                         }
                         .padding(16)
@@ -94,6 +100,7 @@ struct CommunityDetailView: View {
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(item: $route) { conv in ConversationView(conversation: conv) }
+        .sheet(item: $profileRef) { ref in UserProfileView(userId: ref.id) }
         .task { detail = try? await APIClient.shared.groupDetail(id: group.id) }
     }
 

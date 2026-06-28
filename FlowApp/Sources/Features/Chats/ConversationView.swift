@@ -17,16 +17,26 @@ struct ConversationView: View {
     @State private var sending = false
     @State private var aiBusy = false
     @State private var suggestions: [String] = []
-    @State private var summary: String?
+    @State private var summaryBox: SummaryBox?
     @State private var showAddAI = false
     @State private var showShareCompanion = false
     @State private var showMembers = false
     @State private var photoItem: PhotosPickerItem?
     @State private var profileRef: UserRef?
     @State private var typingName: String?
+    @State private var mentionQuery: String?
 
     private var myId: Int? { auth.user?.id }
     private var aiMembers: [ConvMemberDTO] { members.filter { $0.is_ai } }
+
+    /// 输入 @ 后的候选成员（含搭子），按当前查询前缀过滤。
+    private var mentionCandidates: [ConvMemberDTO] {
+        guard let q = mentionQuery else { return [] }
+        let pool = members.filter { $0.user_id != myId }   // 排除自己，包含 AI 搭子
+        guard !q.isEmpty else { return pool }
+        let lq = q.lowercased()
+        return pool.filter { $0.name.lowercased().contains(lq) }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -55,7 +65,7 @@ struct ConversationView: View {
                 }
             }
             if !suggestions.isEmpty { suggestionBar }
-            if !aiMembers.isEmpty { aiBar }
+            if mentionQuery != nil && !mentionCandidates.isEmpty { mentionBar }
             inputBar
         }
         .background(PaperBackground())
@@ -83,6 +93,7 @@ struct ConversationView: View {
         }
         .onChange(of: draft) { _, v in
             if !v.isEmpty { ChatSocket.shared.sendTyping(conversationId: conversation.id) }
+            updateMention(v)
         }
         .onAppear { ui.hideTabBar = true }
         .onDisappear { ui.hideTabBar = false }
@@ -103,7 +114,7 @@ struct ConversationView: View {
                 await MainActor.run { photoItem = nil }
             }
         }
-        .sheet(item: Binding(get: { summary.map { SummaryBox(text: $0) } }, set: { if $0 == nil { summary = nil } })) { box in
+        .sheet(item: $summaryBox) { box in
             SummarySheet(text: box.text)
         }
     }
@@ -127,7 +138,7 @@ struct ConversationView: View {
     private func send() {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !sending else { return }
-        draft = ""; sending = true; suggestions = []
+        draft = ""; sending = true; suggestions = []; mentionQuery = nil
         Task {
             let m = try? await APIClient.shared.sendMessage(conversationId: conversation.id, content: text)
             await MainActor.run { if let m { appendUnique(m) }; sending = false }
@@ -135,8 +146,31 @@ struct ConversationView: View {
             if conversation.type == "companion" || (!conversation.is_group && aiMembers.count == 1),
                let only = aiMembers.first?.companion_id {
                 await summon(only)
+            } else if conversation.is_group {
+                // 群里 @ 了某个搭子 → 让它接话（可同时 @ 多个）
+                for ai in aiMembers where text.contains("@\(ai.name)") {
+                    if let cid = ai.companion_id { await summon(cid) }
+                }
             }
         }
+    }
+
+    /// 解析草稿末尾的 @token：最后一个 @ 之后若无空格则进入提示模式。
+    private func updateMention(_ text: String) {
+        guard conversation.is_group, let at = text.lastIndex(of: "@") else { mentionQuery = nil; return }
+        let after = text[text.index(after: at)...]
+        if after.contains(where: { $0 == " " || $0 == "\n" }) { mentionQuery = nil; return }
+        mentionQuery = String(after)
+    }
+
+    /// 选中候选 → 用 @名称 替换草稿末尾的 @token。
+    private func insertMention(_ name: String) {
+        if let at = draft.lastIndex(of: "@") {
+            draft = String(draft[..<at]) + "@\(name) "
+        } else {
+            draft += "@\(name) "
+        }
+        mentionQuery = nil
     }
 
     private func summon(_ companionId: Int) async {
@@ -184,7 +218,7 @@ struct ConversationView: View {
     private func runSummarize() {
         Task {
             if let s = try? await APIClient.shared.summarize(messages: recentDTOs()) {
-                await MainActor.run { summary = s }
+                await MainActor.run { summaryBox = SummaryBox(text: s) }
             }
         }
     }
@@ -230,24 +264,30 @@ struct ConversationView: View {
         .background(FlowTheme.card.overlay(Rectangle().fill(FlowTheme.stroke).frame(height: 1), alignment: .bottom))
     }
 
-    private var aiBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(aiMembers) { m in
-                    Button { if let cid = m.companion_id { Task { await summon(cid) } } } label: {
-                        HStack(spacing: 6) {
-                            Avatar(initials: m.initials, tint: m.tintColor, size: 22)
-                            Text("\(loc.t("conv.summon"))\(m.name)").font(FlowTheme.caption(12)).foregroundStyle(FlowTheme.teal)
+    /// @ 自动提示面板：输入 @ 后实时显示候选成员/搭子，点选补全。
+    private var mentionBar: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                ForEach(mentionCandidates) { m in
+                    Button { insertMention(m.name) } label: {
+                        HStack(spacing: 10) {
+                            Avatar(initials: m.initials, tint: m.tintColor, size: 28)
+                            Text(m.name).font(FlowTheme.body(15)).foregroundStyle(FlowTheme.ink)
+                            if m.is_ai {
+                                Text(loc.t("conv.aiTag")).font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(.white).padding(.horizontal, 6).padding(.vertical, 2)
+                                    .background(Capsule().fill(FlowTheme.teal))
+                            }
+                            Spacer()
                         }
-                        .padding(.horizontal, 10).padding(.vertical, 6)
-                        .background(Capsule().fill(FlowTheme.teal.opacity(0.1)))
-                    }
-                    .disabled(aiBusy)
+                        .padding(.horizontal, 16).padding(.vertical, 9)
+                        .contentShape(Rectangle())
+                    }.buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal, 14).padding(.vertical, 6)
         }
-        .background(FlowTheme.parchment)
+        .frame(maxHeight: 180)
+        .background(FlowTheme.card.overlay(Rectangle().fill(FlowTheme.stroke).frame(height: 1), alignment: .top))
     }
 
     private var suggestionBar: some View {
@@ -268,13 +308,6 @@ struct ConversationView: View {
 
     private var inputBar: some View {
         HStack(spacing: 10) {
-            if conversation.is_group {
-                Menu {
-                    ForEach(members.filter { !$0.is_ai && $0.user_id != myId }) { m in
-                        Button(m.name) { draft += "@\(m.name) " }
-                    }
-                } label: { Image(systemName: "at").font(.system(size: 18)).foregroundStyle(FlowTheme.gray) }
-            }
             PhotosPicker(selection: $photoItem, matching: .images) {
                 Image(systemName: "photo").font(.system(size: 20)).foregroundStyle(FlowTheme.gray)
             }
@@ -474,6 +507,7 @@ struct GroupMembersView: View {
     @State private var showEdit = false
     @State private var showInvite = false
     @State private var announcement = ""
+    @State private var profileRef: UserRef?
 
     private var amOwner: Bool { members.first { $0.user_id == myId }?.role == "owner" }
     private var countSuffix: String {
@@ -520,7 +554,13 @@ struct GroupMembersView: View {
                     ForEach(Array(members.enumerated()), id: \.element.id) { idx, m in
                         HStack(spacing: 11) {
                             Avatar(initials: m.initials, tint: m.tintColor, size: 38, seed: UInt64(idx + 210), imageURL: m.avatar_url)
-                            Text(m.name).font(.system(size: 15, weight: .semibold)).foregroundStyle(FlowTheme.ink)
+                            if let uid = m.user_id, !m.is_ai, uid != myId {
+                                Button { profileRef = UserRef(id: uid) } label: {
+                                    Text(m.name).font(.system(size: 15, weight: .semibold)).foregroundStyle(FlowTheme.ink)
+                                }.buttonStyle(.plain)
+                            } else {
+                                Text(m.name).font(.system(size: 15, weight: .semibold)).foregroundStyle(FlowTheme.ink)
+                            }
                             if m.role == "owner" {
                                 Text(loc.t("community.owner")).font(.system(size: 10, weight: .bold)).foregroundStyle(.white)
                                     .padding(.horizontal, 7).padding(.vertical, 3).background(Capsule().fill(FlowTheme.teal))
@@ -550,6 +590,7 @@ struct GroupMembersView: View {
         .task { announcement = conversation.announcement ?? ""; await reload() }
         .sheet(isPresented: $showEdit) { GroupEditView(conversation: conversation) { c in announcement = c.announcement ?? "" } }
         .sheet(isPresented: $showInvite) { InviteFriendsView(conversation: conversation, existing: Set(members.compactMap { $0.user_id })) { Task { await reload() } } }
+        .sheet(item: $profileRef) { ref in UserProfileView(userId: ref.id) }
     }
 
     private func reload() async {

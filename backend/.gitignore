@@ -6,3 +6,4 @@ flow.db
 storage/
 
 uvicorn.log
+venv/

@@ -59,10 +59,11 @@ class GroupIn(BaseModel):
 
 @router.post("/groups")
 def create_group(body: GroupIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    tmax = 2000 if user.is_pro else 500  # 会员可建更大的群
     g = Group(owner_id=user.id, owner_name=user.nickname, name=body.name, description=body.description,
               avatar=body.avatar or body.name[:1], tint=body.tint,
               join_mode=body.join_mode if body.join_mode in ("open", "code", "approval") else "open",
-              member_cap=body.member_cap, invite_code=_gen_code())
+              member_cap=min(body.member_cap, tmax), invite_code=_gen_code())
     db.add(g)
     db.commit()
     db.refresh(g)
@@ -122,7 +123,7 @@ def group_detail(gid: int, user: User = Depends(get_current_user), db: Session =
         name = u.nickname if u else "用户"
         first = name[:1]
         initials = name[:2].upper() if first.isascii() else name[:1]
-        out.append({"name": name, "initials": initials, "is_owner": m.user_id == g.owner_id})
+        out.append({"user_id": m.user_id, "name": name, "initials": initials, "is_owner": m.user_id == g.owner_id})
     d = _dict(db, g, user.id)
     d["members"] = out
     return d

@@ -37,6 +37,7 @@ final class Localization: ObservableObject {
         "conv.members":    [.zh: "位成员", .en: "members"],
         "conv.addAI":      [.zh: "加入 AI 搭子", .en: "Add AI companion"],
         "conv.summon":     [.zh: "让", .en: "Ask "],
+        "conv.aiTag":      [.zh: "搭子", .en: "AI"],
         "conv.summarize":  [.zh: "总结群聊", .en: "Summarize"],
         "conv.smartReply": [.zh: "智能回复", .en: "Smart reply"],
         "conv.summary":    [.zh: "群聊总结", .en: "Summary"],

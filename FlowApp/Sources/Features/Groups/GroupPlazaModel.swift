@@ -31,6 +31,7 @@ struct PlazaGroup: Codable, Identifiable, Hashable {
 }
 
 struct GroupMemberDTO: Codable, Hashable {
+    var user_id: Int? = nil
     let name: String
     let initials: String
     let is_owner: Bool
