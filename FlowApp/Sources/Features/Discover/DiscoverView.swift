@@ -22,7 +22,7 @@ struct DiscoverView: View {
                 switch section {
                 case 0: MarketListView()
                 case 1: GroupPlazaView()
-                default: comingSoon
+                default: MomentsView()
                 }
             }
             .background(PaperBackground())

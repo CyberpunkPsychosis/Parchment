@@ -413,6 +413,42 @@ final class APIClient {
         return try await send(req, as: R.self).friends
     }
 
+    // MARK: 朋友圈 / 动态 + 推送
+
+    func momentsFeed() async throws -> [MomentPost] {
+        struct R: Decodable { let posts: [MomentPost] }
+        let req = try makeRequest("/moments", method: "GET")
+        return try await send(req, as: R.self).posts
+    }
+
+    func createPost(content: String, imageURL: String? = nil) async throws -> MomentPost {
+        struct B: Encodable { let content: String; let image_url: String? }
+        let req = try makeRequest("/moments", method: "POST", body: B(content: content, image_url: imageURL))
+        return try await send(req, as: MomentPost.self)
+    }
+
+    @discardableResult
+    func toggleLike(postId: Int) async throws -> LikeResult {
+        let req = try makeRequest("/moments/\(postId)/like", method: "POST")
+        return try await send(req, as: LikeResult.self)
+    }
+
+    func listComments(postId: Int) async throws -> [MomentComment] {
+        struct R: Decodable { let comments: [MomentComment] }
+        let req = try makeRequest("/moments/\(postId)/comments", method: "GET")
+        return try await send(req, as: R.self).comments
+    }
+
+    func addComment(postId: Int, content: String) async throws -> MomentComment {
+        let req = try makeRequest("/moments/\(postId)/comments", method: "POST", body: ["content": content])
+        return try await send(req, as: MomentComment.self)
+    }
+
+    func registerDevice(token: String) async throws {
+        let req = try makeRequest("/devices", method: "POST", body: ["token": token, "platform": "ios"])
+        _ = try await URLSession.shared.data(for: req)
+    }
+
     // MARK: 流式对话（SSE）
 
     /// 调 /chat/stream，逐增量回调文本片段。companionId 不为空则后端注入其记忆并自动提取。

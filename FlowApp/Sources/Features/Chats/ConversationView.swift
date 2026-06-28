@@ -17,6 +17,7 @@ struct ConversationView: View {
     @State private var suggestions: [String] = []
     @State private var summary: String?
     @State private var showAddAI = false
+    @State private var profileRef: UserRef?
 
     private var myId: Int? { auth.user?.id }
     private var aiMembers: [ConvMemberDTO] { members.filter { $0.is_ai } }
@@ -28,7 +29,8 @@ struct ConversationView: View {
                 ScrollView {
                     LazyVStack(spacing: 12) {
                         ForEach(messages) { m in
-                            ConvBubble(msg: m, myId: myId, isGroup: conversation.is_group).id(m.id)
+                            ConvBubble(msg: m, myId: myId, isGroup: conversation.is_group,
+                                       onAvatarTap: { uid in profileRef = UserRef(id: uid) }).id(m.id)
                         }
                         if aiBusy { HStack { ProgressView().tint(FlowTheme.teal); Spacer() }.padding(.leading, 8) }
                     }
@@ -55,6 +57,7 @@ struct ConversationView: View {
         .onAppear { ui.hideTabBar = true }
         .onDisappear { ui.hideTabBar = false }
         .sheet(isPresented: $showAddAI) { CompanionPickerView { id in addCompanion(id) } }
+        .sheet(item: $profileRef) { ref in UserProfileView(userId: ref.id) }
         .sheet(item: Binding(get: { summary.map { SummaryBox(text: $0) } }, set: { if $0 == nil { summary = nil } })) { box in
             SummarySheet(text: box.text)
         }
@@ -274,17 +277,25 @@ struct CompanionPickerView: View {
 }
 
 /// 会话气泡：群聊时为他人显示头像 + 名字。
+struct UserRef: Identifiable { let id: Int }
+
 struct ConvBubble: View {
     let msg: MessageDTO
     let myId: Int?
     let isGroup: Bool
+    var onAvatarTap: ((Int) -> Void)? = nil
 
     private var mine: Bool { msg.sender_user_id != nil && msg.sender_user_id == myId }
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             if mine { Spacer(minLength: 48) }
-            if !mine { Avatar(initials: msg.sender_avatar, tint: msg.senderColor, size: 34) }
+            if !mine {
+                let av = Avatar(initials: msg.sender_avatar, tint: msg.senderColor, size: 34)
+                if let uid = msg.sender_user_id, !msg.is_ai {
+                    Button { onAvatarTap?(uid) } label: { av }.buttonStyle(.plain)
+                } else { av }
+            }
             VStack(alignment: mine ? .trailing : .leading, spacing: 3) {
                 if (isGroup || msg.is_ai) && !mine {
                     Text(msg.sender_name).font(FlowTheme.caption(11)).foregroundStyle(FlowTheme.gray)

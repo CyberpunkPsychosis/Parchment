@@ -2,6 +2,7 @@ import SwiftUI
 
 @main
 struct FlowApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var loc = Localization()
     @StateObject private var auth = AuthStore()
     @StateObject private var theme = Theme()

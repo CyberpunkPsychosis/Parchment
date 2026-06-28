@@ -22,6 +22,7 @@ final class AuthStore: ObservableObject {
     private func bootstrap() async {
         do {
             user = try await APIClient.shared.me()
+            PushManager.shared.register()
         } catch {
             // token 失效 → 清掉
             Keychain.clear()
@@ -63,6 +64,7 @@ final class AuthStore: ObservableObject {
         Keychain.save(res.token)
         APIClient.shared.token = res.token
         ChatSocket.shared.connect(token: res.token)
+        PushManager.shared.register()
         user = res.user
     }
 }
