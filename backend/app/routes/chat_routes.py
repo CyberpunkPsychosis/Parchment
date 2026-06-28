@@ -11,6 +11,7 @@ from ..db import get_db
 from ..models import User, Companion, Memory
 from ..providers import stream_chat_events, complete_chat
 from ..usage import consume
+from .messaging_routes import PERSONA_DIRECTIVE
 
 router = APIRouter(tags=["chat"])
 
@@ -43,7 +44,7 @@ async def chat_stream(body: ChatIn,
         if companion:
             mems = (db.query(Memory).filter(Memory.companion_id == companion.id)
                     .order_by(Memory.created_at.desc()).limit(40).all())
-            system = companion.persona
+            system = PERSONA_DIRECTIVE + companion.persona
             own = [m for m in mems if not m.origin]                             # 当前用户自己的
             group = [m for m in mems if m.origin and m.source == "group"]       # 群里大家贡献的
             inherited = [m for m in mems if m.origin and m.source == "inherited"]  # 历任主人传承的

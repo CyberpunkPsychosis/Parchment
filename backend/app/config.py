@@ -20,7 +20,7 @@ STORAGE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage"
 DAILY_LIMITS = {"free": 20, "pro": 100}
 
 # --- 上下文截断：每次最多发给模型的历史消息条数（控制输入 token）---
-MAX_CONTEXT_MESSAGES = 16
+MAX_CONTEXT_MESSAGES = 30
 
 # --- 模型池（从 model_pool.json 热加载）---
 _POOL_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "model_pool.json")

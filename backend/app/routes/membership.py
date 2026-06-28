@@ -21,7 +21,7 @@ _PLAN_BY_ID = {p["id"]: p for p in PLANS}
 
 # 会员权益（前端付费墙展示）
 BENEFITS = [
-    {"zh": "解锁高级模型（DeepSeek V4）", "en": "Premium model (DeepSeek V4)"},
+    {"zh": "解锁更聪明的高级模型", "en": "Smarter premium model"},
     {"zh": "每天 100 次 AI 对话", "en": "100 AI chats per day"},
     {"zh": "更快的响应与更长记忆", "en": "Faster replies, longer memory"},
     {"zh": "全部 AI 搭子与助手功能", "en": "All companions & assistant tools"},

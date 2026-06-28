@@ -17,7 +17,6 @@ struct ConversationView: View {
     @State private var sending = false
     @State private var aiBusy = false
     @State private var suggestions: [String] = []
-    @State private var summaryBox: SummaryBox?
     @State private var showAddAI = false
     @State private var showShareCompanion = false
     @State private var showMembers = false
@@ -140,9 +139,6 @@ struct ConversationView: View {
                 }
                 await MainActor.run { photoItem = nil }
             }
-        }
-        .sheet(item: $summaryBox) { box in
-            SummarySheet(text: box.text)
         }
     }
 
@@ -291,14 +287,6 @@ struct ConversationView: View {
         }
     }
 
-    private func runSummarize() {
-        Task {
-            if let s = try? await APIClient.shared.summarize(messages: recentDTOs()) {
-                await MainActor.run { summaryBox = SummaryBox(text: s) }
-            }
-        }
-    }
-
     private func runSuggest() {
         Task {
             if let s = try? await APIClient.shared.replySuggest(messages: recentDTOs()) {
@@ -335,7 +323,6 @@ struct ConversationView: View {
                 Button { showBgPicker = true } label: { Label(loc.t("bg.title"), systemImage: "photo.on.rectangle") }
                 Button { runSuggest() } label: { Label(loc.t("conv.smartReply"), systemImage: "wand.and.stars") }
                 if conversation.is_group {
-                    Button { runSummarize() } label: { Label(loc.t("conv.summarize"), systemImage: "list.bullet.rectangle") }
                     Button { showMembers = true } label: { Label(loc.t("conv.members.manage"), systemImage: "person.2") }
                 }
             } label: {
@@ -484,25 +471,6 @@ struct ForwardPickerView: View {
             }.padding(16)
         }
         .task { conversations = (try? await APIClient.shared.listConversations()) ?? [] }
-    }
-}
-
-private struct SummaryBox: Identifiable { let id = UUID(); let text: String }
-
-private struct SummarySheet: View {
-    @EnvironmentObject var loc: Localization
-    @Environment(\.dismiss) private var dismiss
-    let text: String
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text(loc.t("conv.summary")).font(FlowTheme.heading(20)).foregroundStyle(FlowTheme.ink)
-                Spacer()
-                Button { dismiss() } label: { Image(systemName: "xmark").foregroundStyle(FlowTheme.gray) }
-            }
-            ScrollView { Text(text).font(FlowTheme.body(15)).foregroundStyle(FlowTheme.ink).frame(maxWidth: .infinity, alignment: .leading) }
-        }
-        .padding(20).background(PaperBackground())
     }
 }
 

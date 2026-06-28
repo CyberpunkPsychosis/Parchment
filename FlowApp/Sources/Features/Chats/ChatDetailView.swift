@@ -251,8 +251,6 @@ struct ChatDetailView: View {
                 Image(systemName: "bell.slash.fill").font(.system(size: 13)).foregroundStyle(FlowTheme.gray)
             }
             Spacer()
-            Image(systemName: "video").font(.system(size: 18)).foregroundStyle(FlowTheme.ink)
-            Image(systemName: "phone").font(.system(size: 17)).foregroundStyle(FlowTheme.ink)
             Menu {
                 if companionId != nil {
                     Button { showMemories = true } label: {
@@ -524,30 +522,28 @@ struct ChatDetailView: View {
 /// Gray-blue hand-drawn thread background (the dark sketch lightened).
 /// 可自定义的聊天背景：内置预设 + 自定义上传图（存 AppStorage，全局生效）。
 struct ChatBackground: View {
-    @AppStorage("flow.chatBg") private var preset = "default"
+    @AppStorage("flow.chatBg") private var preset = "beige"
     @AppStorage("flow.chatBgURL") private var customURL = ""
 
     var body: some View {
         ZStack {
             switch preset {
-            case "paper":
-                FlowTheme.parchment
-                Image("paper_light").resizable().scaledToFill().opacity(0.6)
             case "sage":
                 FlowTheme.sage.opacity(0.35)
-            case "beige":
-                FlowTheme.beige
             case "plain":
                 Color(hex: 0xF7F4EC)
+            case "mist":
+                Color(hex: 0xE7EEF1)
+            case "blush":
+                Color(hex: 0xF5E8E0)
             case "custom":
                 if let u = URL(string: customURL), !customURL.isEmpty {
-                    AsyncImage(url: u) { img in img.resizable().scaledToFill() } placeholder: { FlowTheme.chatBg }
+                    AsyncImage(url: u) { img in img.resizable().scaledToFill() } placeholder: { FlowTheme.beige }
                 } else {
-                    FlowTheme.chatBg
+                    FlowTheme.beige
                 }
-            default:
-                FlowTheme.chatBg
-                Image("paper_dark").resizable().scaledToFill().opacity(0.5)
+            default:   // beige（默认）及任何旧值都回落米色
+                FlowTheme.beige
             }
         }
         .clipped()
@@ -558,14 +554,14 @@ struct ChatBackground: View {
 struct ChatBackgroundPicker: View {
     @EnvironmentObject var loc: Localization
     @Environment(\.dismiss) private var dismiss
-    @AppStorage("flow.chatBg") private var preset = "default"
+    @AppStorage("flow.chatBg") private var preset = "beige"
     @AppStorage("flow.chatBgURL") private var customURL = ""
     @State private var photoItem: PhotosPickerItem?
     @State private var uploading = false
 
     private let presets: [(id: String, key: String)] = [
-        ("default", "bg.default"), ("paper", "bg.paper"), ("sage", "bg.sage"),
-        ("beige", "bg.beige"), ("plain", "bg.plain"),
+        ("beige", "bg.beige"), ("plain", "bg.plain"), ("sage", "bg.sage"),
+        ("mist", "bg.mist"), ("blush", "bg.blush"),
     ]
 
     var body: some View {
@@ -627,11 +623,11 @@ struct ChatBackgroundPicker: View {
 
     @ViewBuilder private func previewBg(_ id: String) -> some View {
         switch id {
-        case "paper": ZStack { FlowTheme.parchment; Image("paper_light").resizable().scaledToFill().opacity(0.6) }
         case "sage": FlowTheme.sage.opacity(0.35)
-        case "beige": FlowTheme.beige
         case "plain": Color(hex: 0xF7F4EC)
-        default: ZStack { FlowTheme.chatBg; Image("paper_dark").resizable().scaledToFill().opacity(0.5) }
+        case "mist": Color(hex: 0xE7EEF1)
+        case "blush": Color(hex: 0xF5E8E0)
+        default: FlowTheme.beige
         }
     }
 }

@@ -61,7 +61,9 @@ final class Localization: ObservableObject {
         "bg.paper":        [.zh: "羊皮纸", .en: "Parchment"],
         "bg.sage":         [.zh: "鼠尾草", .en: "Sage"],
         "bg.beige":        [.zh: "米色", .en: "Beige"],
-        "bg.plain":        [.zh: "纯色", .en: "Plain"],
+        "bg.plain":        [.zh: "奶白", .en: "Plain"],
+        "bg.mist":         [.zh: "雾蓝", .en: "Mist"],
+        "bg.blush":        [.zh: "浅杏", .en: "Blush"],
         // 拉黑 / 举报
         "safety.block":    [.zh: "拉黑", .en: "Block"],
         "safety.unblock":  [.zh: "解除", .en: "Unblock"],
@@ -88,6 +90,7 @@ final class Localization: ObservableObject {
         "conv.unmute":     [.zh: "取消免打扰", .en: "Unmute"],
         "conv.delete":     [.zh: "删除会话", .en: "Delete"],
         "moments.addPhoto":[.zh: "加图片", .en: "Add photo"],
+        "moments.polish":  [.zh: "AI 润色", .en: "AI polish"],
         "moments.uploading":[.zh: "上传中…", .en: "Uploading…"],
         "moments.post":    [.zh: "发动态", .en: "New post"],
         "moments.send":    [.zh: "发布", .en: "Send"],

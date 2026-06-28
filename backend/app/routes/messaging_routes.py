@@ -475,11 +475,16 @@ def add_member(cid: int, body: AddMemberIn,
     return conv_dict(db, conv, user.id)
 
 
-def _companion_system(db: Session, comp: Companion) -> str:
+# 让模型严格扮演 persona 的强约束前缀（chat_routes 与此保持一致）
+PERSONA_DIRECTIVE = ("请始终严格扮演下面设定的角色，全程保持这个角色的性格、语气和说话方式，"
+                     "用第一人称代入，不要跳出角色，也不要自称 AI、助手或语言模型。\n\n角色设定：\n")
+
+
+def _companion_system(db: Session, comp: Companion, group_context: bool = False) -> str:
     """搭子 persona + 注入记忆。区分：主人本人 / 群里大家 / 历任主人。"""
     mems = (db.query(Memory).filter(Memory.companion_id == comp.id)
             .order_by(Memory.created_at.desc()).limit(60).all())
-    system = comp.persona
+    system = PERSONA_DIRECTIVE + comp.persona
     own = [m for m in mems if not m.origin]
     group = [m for m in mems if m.origin and m.source == "group"]
     inherited = [m for m in mems if m.origin and m.source == "inherited"]
@@ -493,6 +498,10 @@ def _companion_system(db: Session, comp: Companion) -> str:
     if own:
         lines = "\n".join(f"- {m.content}" for m in own)
         system += "\n\n[关于现在和你聊天的人，你记得这些，自然运用]\n" + lines
+    if group_context:
+        system += ("\n\n[你正在一个群聊里。下面对话中带「昵称：」前缀的，都是群里成员最近说的话，"
+                   "你能完整看到这些消息。如果有人请你总结、回顾或梳理群聊内容，"
+                   "请直接基于这些消息来回答，不要说自己看不到或没有记录。]")
     return system
 
 
@@ -629,17 +638,21 @@ async def ai_reply(cid: int, body: AIReplyIn,
 
     consume(db, user)  # 超额抛 429
     tier = "pro" if user.is_pro else "free"
+    is_group = conv.type == "group"
     rows = (db.query(Message).filter(Message.conversation_id == cid)
-            .order_by(Message.created_at.desc()).limit(20).all())[::-1]
+            .order_by(Message.created_at.desc()).limit(40).all())[::-1]
+    _placeholder = {"image": "[图片]", "sticker": "[表情]", "voice": "[语音]",
+                    "companion": "[搭子名片]", "file": "[文件]"}
     msgs = []
     for m in rows:
         if m.sender_companion_id == comp.id:
             msgs.append({"role": "assistant", "content": m.content})
-        elif m.kind == "text":
+        elif m.sender_user_id and m.kind != "system":
             who = serialize_message(db, m)["sender_name"]
-            msgs.append({"role": "user", "content": f"{who}：{m.content}"})
+            body = m.content if m.kind == "text" else _placeholder.get(m.kind, "[消息]")
+            msgs.append({"role": "user", "content": f"{who}：{body}"})
     reply = await complete_chat(tier, msgs or [{"role": "user", "content": "（群里还没消息，请打个招呼）"}],
-                                system=_companion_system(db, comp))
+                                system=_companion_system(db, comp, group_context=is_group))
     out = Message(conversation_id=cid, sender_companion_id=comp.id, kind="text", content=reply.strip())
     db.add(out)
     leveled = comp.add_exp()   # 互动涨经验（按天封顶）

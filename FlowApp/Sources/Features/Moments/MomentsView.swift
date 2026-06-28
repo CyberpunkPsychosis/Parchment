@@ -102,6 +102,7 @@ struct ComposeMomentView: View {
     @State private var imageURL: String?
     @State private var uploading = false
     @State private var posting = false
+    @State private var polishing = false
 
     var body: some View {
         VStack(spacing: 16) {
@@ -125,6 +126,15 @@ struct ComposeMomentView: View {
                     }
                     .foregroundStyle(FlowTheme.teal)
                 }
+                Button { polish() } label: {
+                    HStack(spacing: 6) {
+                        if polishing { ProgressView().scaleEffect(0.7) }
+                        else { Image(systemName: "wand.and.stars") }
+                        Text(loc.t("moments.polish")).font(FlowTheme.caption(13))
+                    }
+                    .foregroundStyle(FlowTheme.teal)
+                }
+                .disabled(polishing || text.trimmingCharacters(in: .whitespaces).isEmpty)
                 if let url = imageURL, let u = URL(string: url) {
                     Spacer()
                     AsyncImage(url: u) { img in img.resizable().scaledToFill() } placeholder: { FlowTheme.beige }
@@ -144,6 +154,19 @@ struct ComposeMomentView: View {
                     await MainActor.run { imageURL = url }
                 }
                 await MainActor.run { uploading = false; photoItem = nil }
+            }
+        }
+    }
+
+    private func polish() {
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty, !polishing else { return }
+        polishing = true
+        Task {
+            let result = try? await APIClient.shared.rewrite(text: t, tone: "自然")
+            await MainActor.run {
+                if let r = result, !r.isEmpty { text = r }
+                polishing = false
             }
         }
     }
