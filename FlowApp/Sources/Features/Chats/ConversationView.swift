@@ -524,7 +524,7 @@ struct ConvBubble: View {
     let isGroup: Bool
     var onAvatarTap: ((Int) -> Void)? = nil
     var onRecall: () -> Void = {}
-    var onReact: (String) -> Void = {}
+    var onReact: (String) -> Void = { _ in }
     var onReply: () -> Void = {}
     var onForward: () -> Void = {}
 
