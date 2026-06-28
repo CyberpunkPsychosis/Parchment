@@ -204,7 +204,7 @@ struct FriendRequestsView: View {
                 VStack(spacing: 10) {
                     ForEach(Array(requests.enumerated()), id: \.element.id) { idx, r in
                         HStack(spacing: 11) {
-                            Avatar(initials: r.initials, tint: r.tintColor, size: 40, seed: UInt64(idx + 130))
+                            Avatar(initials: r.initials, tint: r.tintColor, size: 40, seed: UInt64(idx + 130), imageURL: r.avatar_url)
                             Text(r.nickname).font(.system(size: 15, weight: .semibold)).foregroundStyle(FlowTheme.ink)
                             Spacer()
                             Button {

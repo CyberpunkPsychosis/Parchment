@@ -3,7 +3,7 @@ import SwiftUI
 /// 发现 = 三栏：搭子市场 / 群组广场 / 朋友圈。
 struct DiscoverView: View {
     @EnvironmentObject var loc: Localization
-    @State private var section = 0
+    @EnvironmentObject var ui: UIState
 
     var body: some View {
         NavigationStack {
@@ -12,14 +12,14 @@ struct DiscoverView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 20).padding(.top, 14).padding(.bottom, 8)
 
-                Picker("", selection: $section) {
+                Picker("", selection: $ui.discoverSection) {
                     Text(loc.t("disc.market")).tag(0)
                     Text(loc.t("disc.groups")).tag(1)
                     Text(loc.t("disc.moments")).tag(2)
                 }
                 .pickerStyle(.segmented).padding(.horizontal, 16).padding(.bottom, 8)
 
-                switch section {
+                switch ui.discoverSection {
                 case 0: MarketListView()
                 case 1: GroupPlazaView()
                 default: MomentsView()

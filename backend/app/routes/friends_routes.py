@@ -108,7 +108,8 @@ def incoming_requests(user: User = Depends(get_current_user), db: Session = Depe
         out.append({"id": r.id, "from_user_id": r.from_user_id,
                     "nickname": r.from_user_name or (u.nickname if u else "用户"),
                     "initials": _initials(r.from_user_name or (u.nickname if u else "")),
-                    "tint": _tint(r.from_user_id)})
+                    "tint": _tint(r.from_user_id),
+                    "avatar_url": u.avatar_url if u else None})
     return {"requests": out}
 
 

@@ -12,6 +12,18 @@ enum FlowTab: String, CaseIterable {
         }
     }
     var key: String { "nav.\(rawValue)" }
+
+    /// 该 Tab 的子页签（用于长按设默认）。无子页签返回 []。
+    var subTabs: [(id: Int, key: String)] {
+        switch self {
+        case .groups:   return [(0, "groups.seg.groups"), (1, "groups.seg.communities")]
+        case .discover: return [(0, "disc.market"), (1, "disc.groups"), (2, "disc.moments")]
+        default:        return []
+        }
+    }
+
+    /// 存"默认子页签"的 UserDefaults key。
+    var defaultSubKey: String { "flow.defaultSub.\(rawValue)" }
 }
 
 struct RootView: View {
@@ -61,7 +73,7 @@ struct FlowTabBar: View {
     var body: some View {
         HStack {
             ForEach(FlowTab.allCases, id: \.self) { t in
-                Button { tab = t } label: {
+                Button { selectTab(t) } label: {
                     VStack(spacing: 3) {
                         Image(systemName: t.icon)
                             .font(.system(size: 18, weight: .medium))
@@ -79,6 +91,18 @@ struct FlowTabBar: View {
                     .foregroundStyle(tab == t ? FlowTheme.teal : FlowTheme.gray)
                     .frame(maxWidth: .infinity)
                 }
+                .contextMenu {
+                    if !t.subTabs.isEmpty {
+                        Section(loc.t("tab.setDefault")) {
+                            ForEach(t.subTabs, id: \.id) { sub in
+                                Button { setDefaultSub(t, sub.id) } label: {
+                                    Label(loc.t(sub.key),
+                                          systemImage: UserDefaults.standard.integer(forKey: t.defaultSubKey) == sub.id ? "checkmark" : "circle")
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
         .padding(.top, 10)
@@ -87,6 +111,32 @@ struct FlowTabBar: View {
             FlowTheme.card
                 .overlay(Rectangle().fill(FlowTheme.stroke).frame(height: 1), alignment: .top)
         )
+    }
+
+    /// 切到某 Tab：若有子页签，落到用户设定的默认子页签。
+    private func selectTab(_ t: FlowTab) {
+        tab = t
+        applyDefaultSub(t)
+    }
+
+    private func applyDefaultSub(_ t: FlowTab) {
+        let d = UserDefaults.standard.integer(forKey: t.defaultSubKey)
+        switch t {
+        case .groups:   ui.groupsSection = d
+        case .discover: ui.discoverSection = d
+        default: break
+        }
+    }
+
+    /// 长按选定：记住为默认子页签，并立即跳过去。
+    private func setDefaultSub(_ t: FlowTab, _ id: Int) {
+        UserDefaults.standard.set(id, forKey: t.defaultSubKey)
+        tab = t
+        switch t {
+        case .groups:   ui.groupsSection = id
+        case .discover: ui.discoverSection = id
+        default: break
+        }
     }
 }
 

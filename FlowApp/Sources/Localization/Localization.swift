@@ -26,6 +26,7 @@ final class Localization: ObservableObject {
         "nav.companions":  [.zh: "搭子", .en: "AI"],
         "nav.groups":      [.zh: "群组", .en: "Groups"],
         "nav.discover":    [.zh: "发现", .en: "Discover"],
+        "tab.setDefault":  [.zh: "设为默认打开", .en: "Open here by default"],
         "nav.profile":     [.zh: "我",   .en: "Profile"],
         "nav.settings":    [.zh: "设置", .en: "Settings"],
         // Chats

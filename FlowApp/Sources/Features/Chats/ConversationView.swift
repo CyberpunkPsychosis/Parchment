@@ -340,7 +340,7 @@ struct ConversationView: View {
                 ForEach(mentionCandidates) { m in
                     Button { insertMention(m.name) } label: {
                         HStack(spacing: 10) {
-                            Avatar(initials: m.initials, tint: m.tintColor, size: 28)
+                            Avatar(initials: m.initials, tint: m.tintColor, size: 28, imageURL: m.avatar_url)
                             Text(m.name).font(FlowTheme.body(15)).foregroundStyle(FlowTheme.ink)
                             if m.is_ai {
                                 Text(loc.t("conv.aiTag")).font(.system(size: 10, weight: .bold))
@@ -494,7 +494,7 @@ struct CompanionPickerView: View {
                     ForEach(Array(companions.enumerated()), id: \.element.id) { idx, c in
                         Button { onPick(c.id); dismiss() } label: {
                             HStack(spacing: 11) {
-                                Avatar(initials: c.avatar, tint: c.tintColor, size: 40, seed: UInt64(idx + 150))
+                                Avatar(initials: c.avatar, tint: c.tintColor, size: 40, seed: UInt64(idx + 150), imageURL: c.avatar_url)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(c.name).font(.system(size: 15, weight: .semibold)).foregroundStyle(FlowTheme.ink)
                                     Text(c.persona).font(FlowTheme.caption(12)).foregroundStyle(FlowTheme.gray).lineLimit(1)

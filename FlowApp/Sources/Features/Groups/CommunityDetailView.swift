@@ -43,7 +43,7 @@ struct CommunityDetailView: View {
                                     if let uid = m.user_id { profileRef = UserRef(id: uid) }
                                 } label: {
                                     HStack(spacing: 10) {
-                                        Avatar(initials: m.initials, tint: FlowTheme.teal, size: 34)
+                                        Avatar(initials: m.initials, tint: FlowTheme.teal, size: 34, imageURL: m.avatar_url)
                                         Text(m.name).font(FlowTheme.body(15)).foregroundStyle(FlowTheme.ink)
                                         if m.is_owner {
                                             Text(loc.t("community.owner")).font(.system(size: 10, weight: .bold))

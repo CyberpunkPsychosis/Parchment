@@ -98,7 +98,7 @@ struct ChatListView: View {
     private var header: some View {
         HStack(spacing: 12) {
             Button { showProfile = true } label: {
-                Avatar(initials: profileInitials, tint: FlowTheme.teal, size: 38, seed: 7)
+                Avatar(initials: profileInitials, tint: FlowTheme.teal, size: 38, seed: 7, imageURL: auth.user?.avatar_url)
             }
             Text(loc.t("chats.title"))
                 .font(FlowTheme.title(30))

@@ -123,7 +123,9 @@ def group_detail(gid: int, user: User = Depends(get_current_user), db: Session =
         name = u.nickname if u else "用户"
         first = name[:1]
         initials = name[:2].upper() if first.isascii() else name[:1]
-        out.append({"user_id": m.user_id, "name": name, "initials": initials, "is_owner": m.user_id == g.owner_id})
+        out.append({"user_id": m.user_id, "name": name, "initials": initials,
+                    "is_owner": m.user_id == g.owner_id,
+                    "avatar_url": u.avatar_url if u else None})
     d = _dict(db, g, user.id)
     d["members"] = out
     return d

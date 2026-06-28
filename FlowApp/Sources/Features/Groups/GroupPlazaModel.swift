@@ -35,4 +35,5 @@ struct GroupMemberDTO: Codable, Hashable {
     let name: String
     let initials: String
     let is_owner: Bool
+    var avatar_url: String? = nil
 }

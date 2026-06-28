@@ -49,7 +49,7 @@ struct UserProfileView: View {
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                 ForEach(Array(comps.enumerated()), id: \.element.id) { idx, c in
                                     HStack(spacing: 11) {
-                                        Avatar(initials: c.avatar, tint: c.tintColor, size: 38, seed: UInt64(idx + 170))
+                                        Avatar(initials: c.avatar, tint: c.tintColor, size: 38, seed: UInt64(idx + 170), imageURL: c.avatar_url)
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text(c.name).font(.system(size: 15, weight: .semibold)).foregroundStyle(FlowTheme.ink)
                                             Text(c.persona).font(FlowTheme.caption(12)).foregroundStyle(FlowTheme.gray).lineLimit(1)

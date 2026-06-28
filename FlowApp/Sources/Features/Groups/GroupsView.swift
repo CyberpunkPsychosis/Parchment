@@ -3,7 +3,7 @@ import SwiftUI
 /// 群组 = 好友内部私群；社群 = 公开社群（发现页可加入）。两段分开。
 struct GroupsView: View {
     @EnvironmentObject var loc: Localization
-    @State private var seg = 0
+    @EnvironmentObject var ui: UIState
     @State private var showCreate = false
     @State private var showContacts = false
     @State private var friendGroups: [ConversationDTO] = []
@@ -25,13 +25,13 @@ struct GroupsView: View {
                 }
                 .padding(.horizontal, 20).padding(.top, 14).padding(.bottom, 8)
 
-                Picker("", selection: $seg) {
+                Picker("", selection: $ui.groupsSection) {
                     Text(loc.t("groups.seg.groups")).tag(0)
                     Text(loc.t("groups.seg.communities")).tag(1)
                 }
                 .pickerStyle(.segmented).padding(.horizontal, 16).padding(.bottom, 8)
 
-                if seg == 0 { friendGroupList } else { GroupPlazaView(mineOnly: true, entersChat: true) }
+                if ui.groupsSection == 0 { friendGroupList } else { GroupPlazaView(mineOnly: true, entersChat: true) }
             }
             .background(PaperBackground())
             .navigationDestination(item: $route) { conv in ConversationView(conversation: conv) }
@@ -39,7 +39,7 @@ struct GroupsView: View {
         .task { await loadFriendGroups() }
         .onReceive(NotificationCenter.default.publisher(for: .flowMessage)) { _ in Task { await loadFriendGroups() } }
         .sheet(isPresented: $showCreate) {
-            if seg == 0 {
+            if ui.groupsSection == 0 {
                 CreateGroupView { conv in route = conv; Task { await loadFriendGroups() } }
             } else {
                 CreatePlazaGroupView { _ in }.environmentObject(loc)
@@ -121,7 +121,7 @@ struct CreateGroupView: View {
                                 if selected.contains(f.id) { selected.remove(f.id) } else { selected.insert(f.id) }
                             } label: {
                                 HStack(spacing: 12) {
-                                    Avatar(initials: f.initials, tint: f.tintColor, size: 38, seed: UInt64(idx + 200))
+                                    Avatar(initials: f.initials, tint: f.tintColor, size: 38, seed: UInt64(idx + 200), imageURL: f.avatar_url)
                                     Text(f.nickname).font(FlowTheme.body(15)).foregroundStyle(FlowTheme.ink)
                                     Spacer()
                                     CheckBox(checked: selected.contains(f.id))
