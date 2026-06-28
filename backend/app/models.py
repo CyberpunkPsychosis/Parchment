@@ -42,6 +42,8 @@ class User(Base):
     tier = Column(String, nullable=False, default="free")  # "free" | "pro"
     tier_expiry = Column(DateTime, nullable=True)
     auto_send_stickers = Column(Boolean, nullable=True)  # None=未选择(首次询问), True/False=已记住偏好
+    is_seed = Column(Boolean, nullable=True)     # 运营注入的假用户（便于一键清空）
+    is_admin = Column(Boolean, nullable=True)    # 运营管理员
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     @property
@@ -63,6 +65,8 @@ class User(Base):
             "tier": "pro" if self.is_pro else "free",
             "tier_expiry": self.tier_expiry.isoformat() if self.tier_expiry else None,
             "auto_send_stickers": self.auto_send_stickers,  # null=首次未选
+            "is_admin": bool(self.is_admin),
+            "is_seed": bool(self.is_seed),
         }
 
 
@@ -464,6 +468,16 @@ class Report(Base):
     target_id = Column(Integer, nullable=False)
     reason = Column(String, nullable=False, default="")
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class SeedState(Base):
+    """运营种子状态：记录每日自动滑入最近一次执行的日期（按天幂等）。"""
+    __tablename__ = "seed_state"
+
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String, unique=True, nullable=False)
+    value = Column(String, nullable=False, default="")
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
 class AssistantMessage(Base):

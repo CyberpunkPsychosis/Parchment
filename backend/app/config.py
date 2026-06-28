@@ -28,6 +28,15 @@ def _int_env(name: str, default: int) -> int:
 DAILY_LIMITS = {"free": _int_env("DAILY_LIMIT_FREE", 0),
                 "pro": _int_env("DAILY_LIMIT_PRO", 0)}
 
+# --- 运营管理员（启动时按 env 引导，凭证不进仓库）---
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "").strip()
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "").strip()
+
+# --- 每日自动滑入假用户/朋友圈 ---
+SEED_DAILY_ENABLED = os.getenv("SEED_DAILY_ENABLED", "true").strip().lower() != "false"
+SEED_DAILY_USERS = _int_env("SEED_DAILY_USERS", 3)
+SEED_DAILY_MOMENTS = _int_env("SEED_DAILY_MOMENTS", 8)
+
 # --- 上下文截断：每次最多发给模型的历史消息条数（控制输入 token）---
 MAX_CONTEXT_MESSAGES = 30
 

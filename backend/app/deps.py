@@ -21,3 +21,10 @@ def get_current_user(
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="用户不存在")
     return user
+
+
+def get_admin_user(user: User = Depends(get_current_user)) -> User:
+    """运营管理员专用：非管理员一律 403。"""
+    if not user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="需要管理员权限")
+    return user
