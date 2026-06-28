@@ -365,6 +365,12 @@ final class APIClient {
         return try await send(req, as: ConversationDTO.self)
     }
 
+    /// 羊皮纸助手：自然语言 → 站内动作提案。
+    func assistantAct(text: String) async throws -> AssistantProposal {
+        let req = try makeRequest("/assistant/act", method: "POST", body: ["text": text])
+        return try await send(req, as: AssistantProposal.self)
+    }
+
     /// 打开（或创建）与某搭子的 1:1 持久化会话。
     func openCompanionConversation(companionId: Int) async throws -> ConversationDTO {
         let req = try makeRequest("/conversations/companion", method: "POST", body: ["companion_id": companionId])

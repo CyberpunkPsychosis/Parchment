@@ -30,6 +30,7 @@ struct RootView: View {
     @EnvironmentObject var loc: Localization
     @EnvironmentObject var ui: UIState
     @State private var tab: FlowTab = .chats
+    @State private var showAssistant = false
 
     var body: some View {
         // 所有页签常驻内存，用透明度切换，避免切走再回来时 @State(会话/输入)被销毁
@@ -46,13 +47,14 @@ struct RootView: View {
             if !ui.hideTabBar {
                 VStack(spacing: 0) {
                     FlowTabBar(tab: $tab)
-                    StatusFooter()
+                    StatusFooter(onTap: { showAssistant = true })
                 }
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .background(PaperBackground())
         .animation(.easeInOut(duration: 0.28), value: ui.hideTabBar)
+        .sheet(isPresented: $showAssistant) { AssistantView().environmentObject(loc) }
     }
 
     /// 常驻渲染每个页签，仅用透明度/命中测试切换可见性（保活 @State）。
@@ -140,20 +142,22 @@ struct FlowTabBar: View {
     }
 }
 
-/// 底部装饰状态条（设计稿原样：已连接 • 100% • 快捷访问）。
+/// 底部「羊皮纸助手」入口条：点开能用自然语言在站内办事。
 struct StatusFooter: View {
     @EnvironmentObject var loc: Localization
+    var onTap: () -> Void = {}
     var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "wifi").font(.system(size: 11))
-            Text(loc.t("footer.connectivity")).font(FlowTheme.caption(11))
-            Spacer()
-            Text("100%").font(FlowTheme.caption(11))
-            Image(systemName: "battery.100").font(.system(size: 11))
+        Button(action: onTap) {
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles").font(.system(size: 12)).foregroundStyle(FlowTheme.teal)
+                Text(loc.t("assistant.entry")).font(FlowTheme.caption(12)).foregroundStyle(FlowTheme.gray)
+                Spacer()
+                Image(systemName: "chevron.up").font(.system(size: 10)).foregroundStyle(FlowTheme.gray.opacity(0.7))
+            }
+            .padding(.horizontal, 18).padding(.vertical, 8)
+            .background(FlowTheme.parchment)
+            .contentShape(Rectangle())
         }
-        .foregroundStyle(FlowTheme.gray)
-        .padding(.horizontal, 18)
-        .padding(.vertical, 6)
-        .background(FlowTheme.parchment)
+        .buttonStyle(.plain)
     }
 }
