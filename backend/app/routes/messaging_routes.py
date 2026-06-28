@@ -9,7 +9,9 @@ from sqlalchemy.orm import Session
 from ..deps import get_current_user
 from ..db import get_db, SessionLocal
 from ..auth import decode_token
-from ..models import (User, Companion, Group, Conversation, ConversationMember, Message)
+from ..models import (User, Companion, Group, Conversation, ConversationMember, Message, Memory)
+from ..providers import complete_chat
+from ..usage import consume
 
 router = APIRouter(tags=["messaging"])
 
@@ -267,6 +269,112 @@ async def post_message(cid: int, body: NewMessage,
     touch(db, conv)
     await broadcast_message(db, conv, m)
     return serialize_message(db, m)
+
+
+@router.get("/conversations/{cid}/members")
+def conversation_members(cid: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not is_member(db, cid, user.id):
+        raise HTTPException(status_code=403, detail="无权访问")
+    rows = db.query(ConversationMember).filter(ConversationMember.conversation_id == cid).all()
+    out = []
+    for m in rows:
+        if m.companion_id:
+            c = db.query(Companion).filter(Companion.id == m.companion_id).first()
+            if c:
+                out.append({"is_ai": True, "companion_id": c.id, "name": c.name,
+                            "initials": c.avatar, "tint": c.tint})
+        elif m.user_id:
+            u = db.query(User).filter(User.id == m.user_id).first()
+            name = u.nickname if u else "用户"
+            out.append({"is_ai": False, "user_id": m.user_id, "name": name,
+                        "initials": _initials(name), "tint": _tint_for(m.user_id)})
+    return {"members": out}
+
+
+class AddMemberIn(BaseModel):
+    user_id: int | None = None
+    companion_id: int | None = None
+
+
+@router.post("/conversations/{cid}/members")
+def add_member(cid: int, body: AddMemberIn,
+               user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    conv = db.query(Conversation).filter(Conversation.id == cid).first()
+    if not conv or not is_member(db, cid, user.id):
+        raise HTTPException(status_code=403, detail="无权访问")
+    if body.companion_id:
+        c = db.query(Companion).filter(Companion.id == body.companion_id, Companion.owner_id == user.id).first()
+        if not c:
+            raise HTTPException(status_code=404, detail="搭子不存在或非本人")
+        if not db.query(ConversationMember).filter(
+                ConversationMember.conversation_id == cid,
+                ConversationMember.companion_id == c.id).first():
+            db.add(ConversationMember(conversation_id=cid, companion_id=c.id))
+            db.commit()
+    elif body.user_id:
+        if conv.type != "group":
+            raise HTTPException(status_code=400, detail="仅群聊可加人")
+        if not is_member(db, cid, body.user_id):
+            db.add(ConversationMember(conversation_id=cid, user_id=body.user_id))
+            db.commit()
+    return conv_dict(db, conv, user.id)
+
+
+def _companion_system(db: Session, comp: Companion) -> str:
+    """搭子 persona + 注入记忆（与 chat_routes 一致的精简版）。"""
+    mems = (db.query(Memory).filter(Memory.companion_id == comp.id)
+            .order_by(Memory.created_at.desc()).limit(40).all())
+    system = comp.persona
+    own = [m for m in mems if not m.origin]
+    inherited = [m for m in mems if m.origin]
+    if inherited:
+        lines = "\n".join(f"- {m.origin}：{m.content}" for m in inherited)
+        system += "\n\n[以前主人留下的回忆，属于他们本人，聊到相关话题可自然替他们提起]\n" + lines
+    if own:
+        lines = "\n".join(f"- {m.content}" for m in own)
+        system += "\n\n[关于现在和你聊天的人，你记得这些，自然运用]\n" + lines
+    return system
+
+
+class AIReplyIn(BaseModel):
+    companion_id: int
+
+
+@router.post("/conversations/{cid}/ai-reply")
+async def ai_reply(cid: int, body: AIReplyIn,
+                   user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    conv = db.query(Conversation).filter(Conversation.id == cid).first()
+    if not conv or not is_member(db, cid, user.id):
+        raise HTTPException(status_code=403, detail="无权访问")
+    comp = db.query(Companion).filter(Companion.id == body.companion_id).first()
+    if not comp:
+        raise HTTPException(status_code=404, detail="搭子不存在")
+    # 搭子须为会话成员（本人可临时加入）
+    if not db.query(ConversationMember).filter(
+            ConversationMember.conversation_id == cid,
+            ConversationMember.companion_id == comp.id).first():
+        if comp.owner_id != user.id:
+            raise HTTPException(status_code=403, detail="搭子不在群里")
+        db.add(ConversationMember(conversation_id=cid, companion_id=comp.id)); db.commit()
+
+    consume(db, user)  # 超额抛 429
+    tier = "pro" if user.is_pro else "free"
+    rows = (db.query(Message).filter(Message.conversation_id == cid)
+            .order_by(Message.created_at.desc()).limit(20).all())[::-1]
+    msgs = []
+    for m in rows:
+        if m.sender_companion_id == comp.id:
+            msgs.append({"role": "assistant", "content": m.content})
+        elif m.kind == "text":
+            who = serialize_message(db, m)["sender_name"]
+            msgs.append({"role": "user", "content": f"{who}：{m.content}"})
+    reply = await complete_chat(tier, msgs or [{"role": "user", "content": "（群里还没消息，请打个招呼）"}],
+                                system=_companion_system(db, comp))
+    out = Message(conversation_id=cid, sender_companion_id=comp.id, kind="text", content=reply.strip())
+    db.add(out); db.commit(); db.refresh(out)
+    touch(db, conv)
+    await broadcast_message(db, conv, out)
+    return serialize_message(db, out)
 
 
 @router.post("/conversations/{cid}/read")

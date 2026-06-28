@@ -169,6 +169,23 @@ async def reply_suggest(body: SuggestIn,
     return {"suggestions": suggestions[:3]}
 
 
+class SummarizeIn(BaseModel):
+    messages: list[ChatMessage]
+
+
+@router.post("/chat/summarize", response_model=TextOut)
+async def summarize(body: SummarizeIn,
+                    user: User = Depends(get_current_user),
+                    db: Session = Depends(get_db)):
+    consume(db, user)
+    tier = "pro" if user.is_pro else "free"
+    convo = "\n".join(f"{m.role}：{m.content}" for m in body.messages)
+    system = ("你是群聊助手。用简洁中文总结下面这段群聊的要点（谁说了什么、达成了什么、待办）。"
+              "分点输出，每点一句话，不要寒暄。")
+    result = await complete_chat(tier, [{"role": "user", "content": f"群聊记录：\n{convo}"}], system=system)
+    return {"result": result.strip()}
+
+
 def _parse_list(raw: str) -> list[str]:
     """尽量从模型输出里解析出字符串数组。"""
     s = raw.strip()
