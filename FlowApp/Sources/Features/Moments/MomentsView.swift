@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 /// 朋友圈/动态流（发现页第三栏）。发帖 / 点赞 / 评论。
 struct MomentsView: View {
@@ -97,6 +98,10 @@ struct ComposeMomentView: View {
     @Environment(\.dismiss) private var dismiss
     var onPosted: () -> Void = {}
     @State private var text = ""
+    @State private var photoItem: PhotosPickerItem?
+    @State private var imageURL: String?
+    @State private var uploading = false
+    @State private var posting = false
 
     var body: some View {
         VStack(spacing: 16) {
@@ -106,19 +111,52 @@ struct ComposeMomentView: View {
                 Text(loc.t("moments.post")).font(FlowTheme.heading(18)).foregroundStyle(FlowTheme.ink)
                 Spacer()
                 Button { post() } label: { Text(loc.t("moments.send")).foregroundStyle(FlowTheme.teal).fontWeight(.semibold) }
-                    .disabled(text.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(posting || (text.trimmingCharacters(in: .whitespaces).isEmpty && imageURL == nil))
             }
             TextEditor(text: $text)
                 .font(FlowTheme.body(16)).frame(maxHeight: .infinity)
                 .padding(10).background(RoundedRectangle(cornerRadius: 14).fill(FlowTheme.field)).sketchBorder(14, width: 1.3, seed: 91)
+
+            HStack {
+                PhotosPicker(selection: $photoItem, matching: .images) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "photo")
+                        Text(uploading ? loc.t("moments.uploading") : loc.t("moments.addPhoto")).font(FlowTheme.caption(13))
+                    }
+                    .foregroundStyle(FlowTheme.teal)
+                }
+                if let url = imageURL, let u = URL(string: url) {
+                    Spacer()
+                    AsyncImage(url: u) { img in img.resizable().scaledToFill() } placeholder: { FlowTheme.beige }
+                        .frame(width: 48, height: 48).clipShape(RoundedRectangle(cornerRadius: 8))
+                    Button { imageURL = nil } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(FlowTheme.gray) }
+                }
+                Spacer()
+            }
         }
         .padding(20).background(PaperBackground())
+        .onChange(of: photoItem) { _, item in
+            guard let item else { return }
+            uploading = true
+            Task {
+                if let data = try? await item.loadTransferable(type: Data.self),
+                   let url = try? await APIClient.shared.uploadImage(data) {
+                    await MainActor.run { imageURL = url }
+                }
+                await MainActor.run { uploading = false; photoItem = nil }
+            }
+        }
     }
 
     private func post() {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !t.isEmpty else { return }
-        Task { _ = try? await APIClient.shared.createPost(content: t); onPosted(); await MainActor.run { dismiss() } }
+        guard !t.isEmpty || imageURL != nil, !posting else { return }
+        posting = true
+        Task {
+            _ = try? await APIClient.shared.createPost(content: t, imageURL: imageURL)
+            onPosted()
+            await MainActor.run { posting = false; dismiss() }
+        }
     }
 }
 

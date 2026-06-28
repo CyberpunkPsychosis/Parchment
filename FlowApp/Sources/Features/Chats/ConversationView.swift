@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 /// 真实会话聊天页（私聊 / 群聊）。REST 拉历史 + 发送，WebSocket 实时收。
 /// 群聊渲染发送者头像与名字，支持加入 AI 搭子、@搭子回复、群聊总结、智能回复。
@@ -17,6 +18,9 @@ struct ConversationView: View {
     @State private var suggestions: [String] = []
     @State private var summary: String?
     @State private var showAddAI = false
+    @State private var showShareCompanion = false
+    @State private var showMembers = false
+    @State private var photoItem: PhotosPickerItem?
     @State private var profileRef: UserRef?
 
     private var myId: Int? { auth.user?.id }
@@ -57,7 +61,22 @@ struct ConversationView: View {
         .onAppear { ui.hideTabBar = true }
         .onDisappear { ui.hideTabBar = false }
         .sheet(isPresented: $showAddAI) { CompanionPickerView { id in addCompanion(id) } }
+        .sheet(isPresented: $showShareCompanion) { CompanionPickerView { id in shareCompanion(id) } }
+        .sheet(isPresented: $showMembers) {
+            GroupMembersView(conversation: conversation, myId: myId, onLeave: { dismiss() })
+        }
         .sheet(item: $profileRef) { ref in UserProfileView(userId: ref.id) }
+        .onChange(of: photoItem) { _, item in
+            guard let item else { return }
+            Task {
+                if let data = try? await item.loadTransferable(type: Data.self),
+                   let url = try? await APIClient.shared.uploadImage(data),
+                   let m = try? await APIClient.shared.sendMessage(conversationId: conversation.id, kind: "image", content: url) {
+                    await MainActor.run { appendUnique(m) }
+                }
+                await MainActor.run { photoItem = nil }
+            }
+        }
         .sheet(item: Binding(get: { summary.map { SummaryBox(text: $0) } }, set: { if $0 == nil { summary = nil } })) { box in
             SummarySheet(text: box.text)
         }
@@ -98,6 +117,14 @@ struct ConversationView: View {
         await MainActor.run { aiBusy = true }
         let m = try? await APIClient.shared.aiReply(conversationId: conversation.id, companionId: companionId)
         await MainActor.run { if let m { appendUnique(m) }; aiBusy = false }
+    }
+
+    private func shareCompanion(_ id: Int) {
+        Task {
+            if let m = try? await APIClient.shared.shareCompanion(conversationId: conversation.id, companionId: id) {
+                await MainActor.run { appendUnique(m) }
+            }
+        }
     }
 
     private func addCompanion(_ id: Int) {
@@ -152,9 +179,11 @@ struct ConversationView: View {
             Spacer()
             Menu {
                 Button { showAddAI = true } label: { Label(loc.t("conv.addAI"), systemImage: "sparkles") }
+                Button { showShareCompanion = true } label: { Label(loc.t("conv.shareCompanion"), systemImage: "person.crop.rectangle") }
                 Button { runSuggest() } label: { Label(loc.t("conv.smartReply"), systemImage: "wand.and.stars") }
                 if conversation.is_group {
                     Button { runSummarize() } label: { Label(loc.t("conv.summarize"), systemImage: "list.bullet.rectangle") }
+                    Button { showMembers = true } label: { Label(loc.t("conv.members.manage"), systemImage: "person.2") }
                 }
             } label: {
                 Image(systemName: "ellipsis.circle").font(.system(size: 20)).foregroundStyle(FlowTheme.ink)
@@ -202,6 +231,9 @@ struct ConversationView: View {
 
     private var inputBar: some View {
         HStack(spacing: 10) {
+            PhotosPicker(selection: $photoItem, matching: .images) {
+                Image(systemName: "photo").font(.system(size: 20)).foregroundStyle(FlowTheme.gray)
+            }
             HStack {
                 TextField(loc.t("chat.placeholder"), text: $draft).font(FlowTheme.body(15)).onSubmit { send() }
             }
@@ -312,6 +344,8 @@ struct ConvBubble: View {
         case "image", "sticker":
             AsyncImage(url: URL(string: msg.content)) { img in img.resizable().scaledToFill() } placeholder: { FlowTheme.beige }
             .frame(width: 140, height: 140).clipShape(RoundedRectangle(cornerRadius: 16)).sketchBorder(16, width: 1.4, seed: UInt64(msg.id))
+        case "companion":
+            CompanionCard(json: msg.content)
         case "system":
             Text(msg.content).font(FlowTheme.caption(12)).foregroundStyle(FlowTheme.gray)
         default:
@@ -320,6 +354,105 @@ struct ConvBubble: View {
                 .foregroundStyle(mine ? FlowTheme.sageInk : FlowTheme.ink)
                 .padding(.horizontal, 14).padding(.vertical, 10)
                 .sketchCard(18, fill: mine ? FlowTheme.sage : Color(hex: 0xFCFAF4), seed: UInt64(msg.id))
+        }
+    }
+}
+
+/// AI 搭子名片消息卡片（kind=companion）。
+struct CompanionCard: View {
+    let json: String
+    private var info: (name: String, avatar: String, tint: String, persona: String) {
+        guard let d = json.data(using: .utf8),
+              let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else {
+            return ("搭子", "AI", "teal", "")
+        }
+        return (o["name"] as? String ?? "搭子", o["avatar"] as? String ?? "AI",
+                o["tint"] as? String ?? "teal", o["persona"] as? String ?? "")
+    }
+    var body: some View {
+        let i = info
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                Avatar(initials: i.avatar, tint: FlowTheme.tint(i.tint), size: 40)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(i.name).font(.system(size: 15, weight: .semibold)).foregroundStyle(FlowTheme.ink)
+                    Text("🤖 AI 搭子名片").font(FlowTheme.caption(11)).foregroundStyle(FlowTheme.gray)
+                }
+            }
+            if !i.persona.isEmpty {
+                Text(i.persona).font(FlowTheme.caption(12)).foregroundStyle(FlowTheme.gray).lineLimit(3)
+            }
+        }
+        .padding(14).frame(width: 220, alignment: .leading)
+        .sketchCard(16, fill: Color(hex: 0xFCFAF4), seed: UInt64(abs(json.hashValue % 1000)))
+    }
+}
+
+/// 群成员管理：列成员，群主可移除，任何人可退群。
+struct GroupMembersView: View {
+    @EnvironmentObject var loc: Localization
+    @Environment(\.dismiss) private var dismiss
+    let conversation: ConversationDTO
+    let myId: Int?
+    var onLeave: () -> Void = {}
+
+    @State private var members: [ConvMemberDTO] = []
+
+    private var amOwner: Bool { members.first { $0.user_id == myId }?.role == "owner" }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text(loc.t("conv.members.manage")).font(FlowTheme.heading(20)).foregroundStyle(FlowTheme.ink)
+                Spacer()
+                Button { dismiss() } label: { Image(systemName: "xmark").foregroundStyle(FlowTheme.gray) }
+            }.padding(20)
+
+            ScrollView {
+                VStack(spacing: 10) {
+                    ForEach(Array(members.enumerated()), id: \.element.id) { idx, m in
+                        HStack(spacing: 11) {
+                            Avatar(initials: m.initials, tint: m.tintColor, size: 38, seed: UInt64(idx + 210))
+                            Text(m.name).font(.system(size: 15, weight: .semibold)).foregroundStyle(FlowTheme.ink)
+                            if m.role == "owner" {
+                                Text(loc.t("community.owner")).font(.system(size: 10, weight: .bold)).foregroundStyle(.white)
+                                    .padding(.horizontal, 7).padding(.vertical, 3).background(Capsule().fill(FlowTheme.teal))
+                            }
+                            if m.is_ai {
+                                Text("AI").font(.system(size: 10, weight: .bold)).foregroundStyle(FlowTheme.teal)
+                                    .padding(.horizontal, 7).padding(.vertical, 3).background(Capsule().fill(FlowTheme.teal.opacity(0.15)))
+                            }
+                            Spacer()
+                            if amOwner && m.role != "owner" {
+                                Button { remove(m) } label: { Image(systemName: "minus.circle").foregroundStyle(FlowTheme.gray) }
+                            }
+                        }
+                        .padding(.horizontal, 14).padding(.vertical, 10)
+                        .sketchCard(16, fill: FlowTheme.card, seed: UInt64(idx + 220))
+                    }
+                }.padding(.horizontal, 20)
+            }
+
+            Button { leave() } label: {
+                Text(loc.t("conv.leave")).font(.system(size: 15, weight: .semibold)).foregroundStyle(.red)
+                    .frame(maxWidth: .infinity).padding(.vertical, 13)
+                    .background(RoundedRectangle(cornerRadius: 14).stroke(Color.red.opacity(0.4), lineWidth: 1.3))
+            }.padding(20)
+        }
+        .background(PaperBackground())
+        .task { members = (try? await APIClient.shared.conversationMembers(conversation.id)) ?? [] }
+    }
+
+    private func remove(_ m: ConvMemberDTO) {
+        Task {
+            try? await APIClient.shared.removeMember(conversation.id, userId: m.user_id, companionId: m.companion_id)
+            members = (try? await APIClient.shared.conversationMembers(conversation.id)) ?? []
+        }
+    }
+    private func leave() {
+        Task {
+            try? await APIClient.shared.leaveConversation(conversation.id)
+            await MainActor.run { dismiss(); onLeave() }
         }
     }
 }

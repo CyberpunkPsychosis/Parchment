@@ -56,6 +56,7 @@ struct ConvMemberDTO: Codable, Identifiable, Hashable {
     let name: String
     let initials: String
     let tint: String
+    var role: String? = nil
 
     var id: String { is_ai ? "c\(companion_id ?? 0)" : "u\(user_id ?? 0)" }
     var tintColor: Color { FlowTheme.tint(tint) }

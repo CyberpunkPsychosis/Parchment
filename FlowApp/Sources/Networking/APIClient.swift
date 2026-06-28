@@ -373,6 +373,41 @@ final class APIClient {
         return try await send(req, as: MessageDTO.self)
     }
 
+    func uploadImage(_ data: Data, mime: String = "image/jpeg") async throws -> String {
+        struct R: Decodable { let url: String }
+        guard let url = URL(string: AppConfig.baseURL.absoluteString + "/upload/image") else { throw APIError.network("无效 URL") }
+        let boundary = "Boundary-\(UUID().uuidString)"
+        var req = URLRequest(url: url); req.httpMethod = "POST"
+        if let token { req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+        req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        let ext = mime.contains("png") ? "png" : "jpg"
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"img.\(ext)\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: \(mime)\r\n\r\n".data(using: .utf8)!)
+        body.append(data)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        req.httpBody = body
+        return try await send(req, as: R.self).url
+    }
+
+    @discardableResult
+    func shareCompanion(conversationId cid: Int, companionId: Int) async throws -> MessageDTO {
+        let req = try makeRequest("/conversations/\(cid)/share-companion", method: "POST", body: ["companion_id": companionId])
+        return try await send(req, as: MessageDTO.self)
+    }
+
+    func leaveConversation(_ cid: Int) async throws {
+        let req = try makeRequest("/conversations/\(cid)/leave", method: "POST")
+        _ = try await URLSession.shared.data(for: req)
+    }
+
+    func removeMember(_ cid: Int, userId: Int? = nil, companionId: Int? = nil) async throws {
+        struct B: Encodable { let user_id: Int?; let companion_id: Int? }
+        let req = try makeRequest("/conversations/\(cid)/remove-member", method: "POST", body: B(user_id: userId, companion_id: companionId))
+        _ = try await URLSession.shared.data(for: req)
+    }
+
     func summarize(messages: [ChatMessageDTO]) async throws -> String {
         struct Body: Encodable { let messages: [ChatMessageDTO] }
         let req = try makeRequest("/chat/summarize", method: "POST", body: Body(messages: messages))
