@@ -41,15 +41,27 @@ struct RootView: View {
             tabContent(.discover) { DiscoverView() }
             tabContent(.settings) { SettingsView() }
         }
+        // 羊皮纸助手：悬浮图标，常驻右下角（聊天页隐藏）
+        .overlay(alignment: .bottomTrailing) {
+            if !ui.hideTabBar {
+                Button { showAssistant = true } label: {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 22, weight: .medium)).foregroundStyle(.white)
+                        .frame(width: 54, height: 54)
+                        .background(Circle().fill(FlowTheme.teal))
+                        .overlay(Circle().stroke(.white.opacity(0.3), lineWidth: 1))
+                        .shadow(color: FlowTheme.ink.opacity(0.22), radius: 6, y: 3)
+                }
+                .padding(.trailing, 16).padding(.bottom, 16)
+                .transition(.scale.combined(with: .opacity))
+            }
+        }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         // 菜单作为底部安全区 inset：收起时内容区（含聊天输入栏）跟着平滑下移，联动一致
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if !ui.hideTabBar {
-                VStack(spacing: 0) {
-                    FlowTabBar(tab: $tab)
-                    StatusFooter(onTap: { showAssistant = true })
-                }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                FlowTabBar(tab: $tab)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .background(PaperBackground())
@@ -139,25 +151,5 @@ struct FlowTabBar: View {
         case .discover: ui.discoverSection = id
         default: break
         }
-    }
-}
-
-/// 底部「羊皮纸助手」入口条：点开能用自然语言在站内办事。
-struct StatusFooter: View {
-    @EnvironmentObject var loc: Localization
-    var onTap: () -> Void = {}
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 8) {
-                Image(systemName: "sparkles").font(.system(size: 12)).foregroundStyle(FlowTheme.teal)
-                Text(loc.t("assistant.entry")).font(FlowTheme.caption(12)).foregroundStyle(FlowTheme.gray)
-                Spacer()
-                Image(systemName: "chevron.up").font(.system(size: 10)).foregroundStyle(FlowTheme.gray.opacity(0.7))
-            }
-            .padding(.horizontal, 18).padding(.vertical, 8)
-            .background(FlowTheme.parchment)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
     }
 }

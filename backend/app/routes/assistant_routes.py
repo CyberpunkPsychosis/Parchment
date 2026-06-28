@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from ..deps import get_current_user
 from ..db import get_db
-from ..models import User, Conversation, ConversationMember, Message
+from ..models import User, Conversation, ConversationMember, Message, Post, Group, GroupMember
 from ..providers import complete_chat
 from ..usage import consume
 from .messaging_routes import conv_dict, serialize_message
@@ -53,6 +53,8 @@ _SYS = """你是「羊皮纸助手」，帮用户在 App 内办事。根据用�
 - 把一段话发到某个会话 → {"action":"send_message","target":"会话名","content":"要发送的内容","say":"对用户的确认话术"}
 - 发一条朋友圈/动态 → {"action":"post_moment","content":"动态正文","say":"对用户的确认话术"}
 - 总结/回顾某个群最近聊了什么 → {"action":"summarize","target":"群名","say":"好的，我看看"}
+- 分析最近的朋友圈/动态（如"今天谁想出去玩""大家最近在聊啥"）→ {"action":"analyze_moments","say":"好的，我看看朋友圈"}
+- 分析社群广场最近都有什么群/什么内容 → {"action":"analyze_plaza","say":"好的，我看看社群广场"}
 规则：target 必须从【会话列表】里选最匹配的名字；想不出具体动作就用 answer。say 用中文、简短自然。
 【会话列表】：%s"""
 
@@ -118,6 +120,29 @@ async def act(body: ActIn, user: User = Depends(get_current_user), db: Session =
             system="你是羊皮纸助手，帮用户快速回顾群聊。")
         return {"kind": "summarize", "conversation_title": target["title"],
                 "say": f"【{target['title']}】最近聊了：\n{summary.strip()}"}
+
+    if action == "analyze_moments":
+        posts = db.query(Post).order_by(Post.created_at.desc()).limit(50).all()
+        if not posts:
+            return {"kind": "answer", "say": "最近朋友圈还没什么动态可以分析～"}
+        lines = [f"{p.author_name}：{p.content or '[图片]'}" for p in posts]
+        result = await complete_chat(tier, [{"role": "user", "content":
+            f"用户的要求：{body.text}\n\n下面是最近的朋友圈动态，请据此分析（点出具体是哪些人/哪些动态）：\n"
+            + "\n".join(lines)}], system="你是羊皮纸助手，帮用户分析朋友圈动态，简洁、点名到人。")
+        return {"kind": "analyze", "say": result.strip() or (say or "我看完啦～")}
+
+    if action == "analyze_plaza":
+        groups = db.query(Group).order_by(Group.created_at.desc()).limit(50).all()
+        if not groups:
+            return {"kind": "answer", "say": "社群广场现在还没什么群～"}
+        lines = []
+        for g in groups:
+            n = db.query(GroupMember).filter(GroupMember.group_id == g.id).count()
+            lines.append(f"{g.name}（{n}人）：{g.description or ''}")
+        result = await complete_chat(tier, [{"role": "user", "content":
+            f"用户的要求：{body.text}\n\n下面是社群广场最近的群，请据此分析最近都流行/聚集了什么内容：\n"
+            + "\n".join(lines)}], system="你是羊皮纸助手，帮用户洞察社群广场的趋势，简洁。")
+        return {"kind": "analyze", "say": result.strip() or (say or "我看完啦～")}
 
     # 默认：直接回答
     return {"kind": "answer", "say": say or raw.strip() or "嗯，我在听～"}
