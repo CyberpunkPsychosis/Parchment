@@ -69,6 +69,9 @@ struct CompanionsView: View {
             CompanionDetailView(companion: c).environmentObject(loc)
         }
         .task { await load() }
+        .onReceive(NotificationCenter.default.publisher(for: .flowCompanionsChanged)) { _ in
+            Task { await load() }
+        }
     }
 
     private var header: some View {

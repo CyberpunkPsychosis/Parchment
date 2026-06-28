@@ -634,7 +634,10 @@ struct CompanionCard: View {
             if let sid = snapshot {
                 Button {
                     adopted = true
-                    Task { _ = try? await APIClient.shared.adopt(snapshotId: sid) }
+                    Task {
+                        _ = try? await APIClient.shared.adopt(snapshotId: sid)
+                        NotificationCenter.default.post(name: .flowCompanionsChanged, object: nil)
+                    }
                 } label: {
                     Text(loc.t(adopted ? "market.adopted" : "market.adopt"))
                         .font(.system(size: 12, weight: .semibold)).foregroundStyle(.white)

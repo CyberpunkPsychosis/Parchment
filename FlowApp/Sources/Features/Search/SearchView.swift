@@ -116,6 +116,7 @@ struct SearchView: View {
         Task {
             _ = try? await APIClient.shared.adopt(snapshotId: c.snapshot_id)
             await MainActor.run { showToast(loc.t("market.adopted")) }
+            NotificationCenter.default.post(name: .flowCompanionsChanged, object: nil)
         }
     }
 

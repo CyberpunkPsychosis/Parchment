@@ -133,7 +133,9 @@ final class Localization: ObservableObject {
         "discover.elite":  [.zh: "精英服务", .en: "Elite Services"],
         "discover.join":   [.zh: "加入", .en: "JOIN"],
         // 发现三栏
-        "disc.market":     [.zh: "搭子市场", .en: "Market"],
+        "disc.market":     [.zh: "AI 搭子", .en: "AI companions"],
+        "market.memCount": [.zh: "记忆", .en: "memories"],
+        "market.adoptCount": [.zh: "人养过", .en: "raised"],
         "disc.groups":     [.zh: "社群广场", .en: "Communities"],
         "disc.moments":    [.zh: "朋友圈", .en: "Moments"],
         "disc.soon":       [.zh: "即将上线", .en: "Coming soon"],
@@ -177,7 +179,7 @@ final class Localization: ObservableObject {
         "market.hiddenA":  [.zh: "还有 ", .en: "+"],
         "market.hiddenB":  [.zh: " 段回忆，认领后聊天慢慢发现", .en: " more — discover them by chatting after adopting"],
         "market.adopt":    [.zh: "认领", .en: "Adopt"],
-        "market.adopted":  [.zh: "已认领 🎉", .en: "Adopted 🎉"],
+        "market.adopted":  [.zh: "已认领", .en: "Adopted"],
         "market.adoptNote":[.zh: "认领后会成为你的搭子，继承这些记忆；你可以继续养它、再发布", .en: "It becomes yours with these memories; keep raising it and re-publish"],
         // 发布
         "publish.menu":    [.zh: "发布到市场", .en: "Publish to market"],

@@ -112,8 +112,8 @@ struct MarketCard: View {
                 Text(item.persona).font(FlowTheme.caption(13)).foregroundStyle(FlowTheme.gray)
                     .lineLimit(2).fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 14) {
-                    Label("\(item.memory_count)", systemImage: "brain").font(FlowTheme.caption(12))
-                    Label("\(item.adopt_count)", systemImage: "arrow.triangle.branch").font(FlowTheme.caption(12))
+                    Label("\(item.memory_count) \(loc.t("market.memCount"))", systemImage: "brain").font(FlowTheme.caption(12))
+                    Label("\(item.adopt_count) \(loc.t("market.adoptCount"))", systemImage: "person.2.fill").font(FlowTheme.caption(12))
                     Spacer()
                 }
                 .foregroundStyle(FlowTheme.gray)

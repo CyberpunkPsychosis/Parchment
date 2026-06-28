@@ -90,6 +90,7 @@ struct MarketDetailView: View {
             _ = try? await APIClient.shared.adopt(snapshotId: item.id)
             done = true
             onAdopted()
+            NotificationCenter.default.post(name: .flowCompanionsChanged, object: nil)
             try? await Task.sleep(nanoseconds: 800_000_000)
             adopting = false
             dismiss()
