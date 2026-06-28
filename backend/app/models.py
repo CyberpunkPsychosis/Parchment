@@ -179,6 +179,28 @@ class GroupJoinRequest(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
+class Friendship(Base):
+    """双向好友关系（存一行，user_a < user_b 去重）。"""
+    __tablename__ = "friendships"
+    __table_args__ = (UniqueConstraint("user_a", "user_b", name="uq_friend_pair"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_a = Column(Integer, index=True, nullable=False)
+    user_b = Column(Integer, index=True, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class FriendRequest(Base):
+    __tablename__ = "friend_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    from_user_id = Column(Integer, index=True, nullable=False)
+    from_user_name = Column(String, nullable=False, default="")
+    to_user_id = Column(Integer, index=True, nullable=False)
+    status = Column(String, nullable=False, default="pending")  # pending | accepted | rejected
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
 class Conversation(Base):
     """统一会话：私聊 / 群聊 / 搭子。所有聊天都落在这里。"""
     __tablename__ = "conversations"

@@ -8,7 +8,8 @@ from sqlalchemy import text
 from .db import Base, engine, SessionLocal
 from . import models  # noqa: F401  注册模型后再建表
 from .routes import (auth_routes, chat_routes, membership, image_routes,
-                     companion_routes, market_routes, group_routes, messaging_routes)
+                     companion_routes, market_routes, group_routes, messaging_routes,
+                     friends_routes)
 from .config import STORAGE_DIR
 from .seed import seed_demo_market, seed_demo_groups
 
@@ -63,6 +64,7 @@ app.include_router(companion_routes.router)
 app.include_router(market_routes.router)
 app.include_router(group_routes.router)
 app.include_router(messaging_routes.router)
+app.include_router(friends_routes.router)
 
 
 @app.get("/")
