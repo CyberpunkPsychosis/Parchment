@@ -344,6 +344,34 @@ final class APIClient {
         _ = try await URLSession.shared.data(for: req)
     }
 
+    func conversationMembers(_ cid: Int) async throws -> [ConvMemberDTO] {
+        struct R: Decodable { let members: [ConvMemberDTO] }
+        let req = try makeRequest("/conversations/\(cid)/members", method: "GET")
+        return try await send(req, as: R.self).members
+    }
+
+    func addCompanionToConversation(_ cid: Int, companionId: Int) async throws {
+        let req = try makeRequest("/conversations/\(cid)/members", method: "POST", body: ["companion_id": companionId])
+        _ = try await URLSession.shared.data(for: req)
+    }
+
+    func addUserToConversation(_ cid: Int, userId: Int) async throws {
+        let req = try makeRequest("/conversations/\(cid)/members", method: "POST", body: ["user_id": userId])
+        _ = try await URLSession.shared.data(for: req)
+    }
+
+    @discardableResult
+    func aiReply(conversationId cid: Int, companionId: Int) async throws -> MessageDTO {
+        let req = try makeRequest("/conversations/\(cid)/ai-reply", method: "POST", body: ["companion_id": companionId])
+        return try await send(req, as: MessageDTO.self)
+    }
+
+    func summarize(messages: [ChatMessageDTO]) async throws -> String {
+        struct Body: Encodable { let messages: [ChatMessageDTO] }
+        let req = try makeRequest("/chat/summarize", method: "POST", body: Body(messages: messages))
+        return try await send(req, as: TextResult.self).result
+    }
+
     // MARK: 好友
 
     func searchUsers(_ q: String) async throws -> [FriendUser] {

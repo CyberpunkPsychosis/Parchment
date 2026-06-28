@@ -49,6 +49,18 @@ struct MessageDTO: Codable, Identifiable, Hashable {
     }
 }
 
+struct ConvMemberDTO: Codable, Identifiable, Hashable {
+    let is_ai: Bool
+    let user_id: Int?
+    let companion_id: Int?
+    let name: String
+    let initials: String
+    let tint: String
+
+    var id: String { is_ai ? "c\(companion_id ?? 0)" : "u\(user_id ?? 0)" }
+    var tintColor: Color { FlowTheme.tint(tint) }
+}
+
 // MARK: - WebSocket 实时投递
 
 extension Notification.Name {
