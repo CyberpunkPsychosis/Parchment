@@ -2,6 +2,28 @@ import SwiftUI
 import PhotosUI
 import UIKit
 
+/// 会话页的弹窗集合：用单个 enum 驱动一个 .sheet(item:)，避免同视图多 .sheet 互相吞掉。
+private enum ConvSheet: Identifiable {
+    case addAI, shareCompanion, members, bgPicker
+    case profile(Int)              // 用户 id
+    case forward(MessageDTO)
+    case memories(Int)             // 搭子 id
+    case editCompanion(Companion)
+
+    var id: String {
+        switch self {
+        case .addAI: return "addAI"
+        case .shareCompanion: return "shareCompanion"
+        case .members: return "members"
+        case .bgPicker: return "bgPicker"
+        case .profile(let uid): return "profile-\(uid)"
+        case .forward(let m): return "forward-\(m.id)"
+        case .memories(let cid): return "memories-\(cid)"
+        case .editCompanion(let c): return "edit-\(c.id)"
+        }
+    }
+}
+
 /// 真实会话聊天页（私聊 / 群聊）。REST 拉历史 + 发送，WebSocket 实时收。
 /// 群聊渲染发送者头像与名字，支持加入 AI 搭子、@搭子回复、群聊总结、智能回复。
 struct ConversationView: View {
@@ -17,22 +39,16 @@ struct ConversationView: View {
     @State private var sending = false
     @State private var aiBusy = false
     @State private var suggestions: [String] = []
-    @State private var showAddAI = false
-    @State private var showShareCompanion = false
-    @State private var showMembers = false
     @State private var photoItem: PhotosPickerItem?
-    @State private var profileRef: UserRef?
     @State private var typingName: String?
     @State private var mentionQuery: String?
     @State private var levelUpToast: String?
     @State private var headerGrowth: CompanionGrowth?
     @State private var replyingTo: MessageDTO?
-    @State private var forwardingMsg: MessageDTO?
     @StateObject private var recorder = AudioRecorder()
-    @State private var showBgPicker = false
-    @State private var showMemories = false
-    @State private var editCompanion: Companion?
     @State private var voiceMode = false
+    // SwiftUI 同一视图挂多个 .sheet 只生效部分，靠后的会被吞；统一用一个 enum 驱动
+    @State private var activeSheet: ConvSheet?
 
     private var myId: Int? { auth.user?.id }
     private var aiMembers: [ConvMemberDTO] { members.filter { $0.is_ai } }
@@ -66,11 +82,11 @@ struct ConversationView: View {
                                     .padding(.vertical, 4)
                             }
                             ConvBubble(msg: m, myId: myId, isGroup: conversation.is_group,
-                                       onAvatarTap: { uid in profileRef = UserRef(id: uid) },
+                                       onAvatarTap: { uid in activeSheet = .profile(uid) },
                                        onRecall: { recall(m) },
                                        onReact: { e in react(m, e) },
                                        onReply: { replyingTo = m },
-                                       onForward: { forwardingMsg = m }).id(m.id)
+                                       onForward: { activeSheet = .forward(m) }).id(m.id)
                         }
                         if let typingName { Text("\(typingName) \(loc.t("chat.typing"))").font(FlowTheme.caption(11)).foregroundStyle(FlowTheme.gray).frame(maxWidth: .infinity, alignment: .leading) }
                         if aiBusy { HStack { ProgressView().tint(FlowTheme.teal); Spacer() }.padding(.leading, 8) }
@@ -131,24 +147,26 @@ struct ConversationView: View {
         }
         .onAppear { ui.hideTabBar = true }
         .onDisappear { ui.hideTabBar = false }
-        .sheet(isPresented: $showAddAI) { CompanionPickerView { id in addCompanion(id) } }
-        .sheet(isPresented: $showShareCompanion) { CompanionPickerView { id in shareCompanion(id) } }
-        .sheet(isPresented: $showMembers) {
-            GroupMembersView(conversation: conversation, myId: myId, onLeave: { dismiss() })
-        }
-        .sheet(item: $profileRef) { ref in UserProfileView(userId: ref.id) }
-        .sheet(item: $forwardingMsg) { m in
-            ForwardPickerView(excludeId: conversation.id) { convId in forward(m, to: convId) }
-                .environmentObject(loc)
-        }
-        .sheet(isPresented: $showBgPicker) { ChatBackgroundPicker().environmentObject(loc) }
-        .sheet(isPresented: $showMemories) {
-            if let cid = companionId {
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .addAI:
+                CompanionPickerView { id in addCompanion(id) }
+            case .shareCompanion:
+                CompanionPickerView { id in shareCompanion(id) }
+            case .members:
+                GroupMembersView(conversation: conversation, myId: myId, onLeave: { dismiss() })
+            case .profile(let uid):
+                UserProfileView(userId: uid)
+            case .forward(let m):
+                ForwardPickerView(excludeId: conversation.id) { convId in forward(m, to: convId) }
+                    .environmentObject(loc)
+            case .bgPicker:
+                ChatBackgroundPicker().environmentObject(loc)
+            case .memories(let cid):
                 MemoriesView(companionId: cid, companionName: conversation.title).environmentObject(loc)
+            case .editCompanion(let c):
+                CreateCompanionView(editing: c) { _ in }.environmentObject(loc)
             }
-        }
-        .sheet(item: $editCompanion) { c in
-            CreateCompanionView(editing: c) { _ in }.environmentObject(loc)
         }
         .onChange(of: photoItem) { _, item in
             guard let item else { return }
@@ -233,7 +251,7 @@ struct ConversationView: View {
         Task {
             let list = (try? await APIClient.shared.listCompanions()) ?? []
             if let c = list.first(where: { $0.id == cid }) {
-                await MainActor.run { editCompanion = c }
+                await MainActor.run { activeSheet = .editCompanion(c) }
             }
         }
     }
@@ -255,7 +273,7 @@ struct ConversationView: View {
     private func forward(_ m: MessageDTO, to convId: Int) {
         Task {
             _ = try? await APIClient.shared.sendMessage(conversationId: convId, kind: m.kind, content: m.content)
-            await MainActor.run { forwardingMsg = nil }
+            await MainActor.run { activeSheet = nil }
         }
     }
 
@@ -352,18 +370,20 @@ struct ConversationView: View {
                 if conversation.type == "companion" {
                     // 搭子 1:1：给搭子专属菜单。认领来的搭子锁定记忆/人设（保留惊喜感），不显示这两项
                     if !isAdoptedCompanion {
-                        Button { showMemories = true } label: { Label(loc.t("memories.title"), systemImage: "brain.head.profile") }
+                        if let cid = companionId {
+                            Button { activeSheet = .memories(cid) } label: { Label(loc.t("memories.title"), systemImage: "brain.head.profile") }
+                        }
                         Button { openEditCompanion() } label: { Label(loc.t("companion.edit"), systemImage: "pencil") }
                     }
-                    Button { showBgPicker = true } label: { Label(loc.t("bg.title"), systemImage: "photo.on.rectangle") }
+                    Button { activeSheet = .bgPicker } label: { Label(loc.t("bg.title"), systemImage: "photo.on.rectangle") }
                     Button { runSuggest() } label: { Label(loc.t("conv.smartReply"), systemImage: "wand.and.stars") }
                 } else {
-                    Button { showAddAI = true } label: { Label(loc.t("conv.addAI"), systemImage: "sparkles") }
-                    Button { showShareCompanion = true } label: { Label(loc.t("conv.shareCompanion"), systemImage: "person.crop.rectangle") }
-                    Button { showBgPicker = true } label: { Label(loc.t("bg.title"), systemImage: "photo.on.rectangle") }
+                    Button { activeSheet = .addAI } label: { Label(loc.t("conv.addAI"), systemImage: "sparkles") }
+                    Button { activeSheet = .shareCompanion } label: { Label(loc.t("conv.shareCompanion"), systemImage: "person.crop.rectangle") }
+                    Button { activeSheet = .bgPicker } label: { Label(loc.t("bg.title"), systemImage: "photo.on.rectangle") }
                     Button { runSuggest() } label: { Label(loc.t("conv.smartReply"), systemImage: "wand.and.stars") }
                     if conversation.is_group {
-                        Button { showMembers = true } label: { Label(loc.t("conv.members.manage"), systemImage: "person.2") }
+                        Button { activeSheet = .members } label: { Label(loc.t("conv.members.manage"), systemImage: "person.2") }
                     }
                 }
             } label: {
@@ -684,6 +704,19 @@ struct CompanionCard: View {
     }
 }
 
+/// 群成员管理页的弹窗集合（单 sheet 驱动）。
+private enum GroupSheet: Identifiable {
+    case edit, invite
+    case profile(Int)
+    var id: String {
+        switch self {
+        case .edit: return "edit"
+        case .invite: return "invite"
+        case .profile(let uid): return "profile-\(uid)"
+        }
+    }
+}
+
 /// 群成员管理：列成员，群主可移除，任何人可退群。
 struct GroupMembersView: View {
     @EnvironmentObject var loc: Localization
@@ -693,10 +726,8 @@ struct GroupMembersView: View {
     var onLeave: () -> Void = {}
 
     @State private var members: [ConvMemberDTO] = []
-    @State private var showEdit = false
-    @State private var showInvite = false
     @State private var announcement = ""
-    @State private var profileRef: UserRef?
+    @State private var activeSheet: GroupSheet?     // 单 sheet 驱动，避免多 .sheet 互吞
 
     private var amOwner: Bool { members.first { $0.user_id == myId }?.role == "owner" }
     private var countSuffix: String {
@@ -727,10 +758,10 @@ struct GroupMembersView: View {
 
             if amOwner {
                 HStack(spacing: 10) {
-                    Button { showEdit = true } label: {
+                    Button { activeSheet = .edit } label: {
                         Label(loc.t("group.edit"), systemImage: "square.and.pencil").font(FlowTheme.caption(13))
                     }
-                    Button { showInvite = true } label: {
+                    Button { activeSheet = .invite } label: {
                         Label(loc.t("group.invite"), systemImage: "person.badge.plus").font(FlowTheme.caption(13))
                     }
                     Spacer()
@@ -745,7 +776,7 @@ struct GroupMembersView: View {
                         HStack(spacing: 11) {
                             Avatar(initials: m.initials, tint: m.tintColor, size: 38, seed: UInt64(idx + 210), imageURL: m.avatar_url)
                             if let uid = m.user_id, !m.is_ai, uid != myId {
-                                Button { profileRef = UserRef(id: uid) } label: {
+                                Button { activeSheet = .profile(uid) } label: {
                                     Text(m.name).font(.system(size: 15, weight: .semibold)).foregroundStyle(FlowTheme.ink)
                                 }.buttonStyle(.plain)
                             } else {
@@ -778,9 +809,16 @@ struct GroupMembersView: View {
         }
         .background(PaperBackground())
         .task { announcement = conversation.announcement ?? ""; await reload() }
-        .sheet(isPresented: $showEdit) { GroupEditView(conversation: conversation) { c in announcement = c.announcement ?? "" } }
-        .sheet(isPresented: $showInvite) { InviteFriendsView(conversation: conversation, existing: Set(members.compactMap { $0.user_id })) { Task { await reload() } } }
-        .sheet(item: $profileRef) { ref in UserProfileView(userId: ref.id) }
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .edit:
+                GroupEditView(conversation: conversation) { c in announcement = c.announcement ?? "" }
+            case .invite:
+                InviteFriendsView(conversation: conversation, existing: Set(members.compactMap { $0.user_id })) { Task { await reload() } }
+            case .profile(let uid):
+                UserProfileView(userId: uid)
+            }
+        }
     }
 
     private func reload() async {
