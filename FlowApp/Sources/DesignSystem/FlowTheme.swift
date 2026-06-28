@@ -43,6 +43,17 @@ enum FlowTheme {
 
     static let cornerCard: CGFloat = 22
     static let cornerField: CGFloat = 16
+
+    /// 把后端返回的 tint 字符串映射成颜色（与 Companion/PlazaGroup 的 tintColor 一致）。
+    static func tint(_ key: String) -> Color {
+        switch key {
+        case "sage": return sage
+        case "ink": return ink
+        case "tealDark": return tealDark
+        case "gray": return gray
+        default: return teal
+        }
+    }
 }
 
 extension Color {

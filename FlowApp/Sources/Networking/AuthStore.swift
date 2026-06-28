@@ -12,6 +12,7 @@ final class AuthStore: ObservableObject {
     init() {
         if let token = Keychain.load() {
             APIClient.shared.token = token
+            ChatSocket.shared.connect(token: token)
             Task { await bootstrap() }
         } else {
             isBootstrapping = false
@@ -42,6 +43,7 @@ final class AuthStore: ObservableObject {
     func logout() {
         Keychain.clear()
         APIClient.shared.token = nil
+        ChatSocket.shared.disconnect()
         user = nil
     }
 
@@ -60,6 +62,7 @@ final class AuthStore: ObservableObject {
     private func apply(_ res: AuthResponse) {
         Keychain.save(res.token)
         APIClient.shared.token = res.token
+        ChatSocket.shared.connect(token: res.token)
         user = res.user
     }
 }

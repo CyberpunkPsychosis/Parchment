@@ -306,6 +306,44 @@ final class APIClient {
         return try await send(req, as: PlazaGroup.self)
     }
 
+    // MARK: 会话 / 消息（统一聊天底座）
+
+    func listConversations() async throws -> [ConversationDTO] {
+        struct R: Decodable { let conversations: [ConversationDTO] }
+        let req = try makeRequest("/conversations", method: "GET")
+        return try await send(req, as: R.self).conversations
+    }
+
+    func openDirect(peerUserId: Int) async throws -> ConversationDTO {
+        struct B: Encodable { let type = "direct"; let peer_user_id: Int }
+        let req = try makeRequest("/conversations", method: "POST", body: B(peer_user_id: peerUserId))
+        return try await send(req, as: ConversationDTO.self)
+    }
+
+    func openGroupConversation(groupId: Int) async throws -> ConversationDTO {
+        struct B: Encodable { let type = "group"; let group_id: Int }
+        let req = try makeRequest("/conversations", method: "POST", body: B(group_id: groupId))
+        return try await send(req, as: ConversationDTO.self)
+    }
+
+    func listMessages(conversationId: Int, afterId: Int = 0) async throws -> [MessageDTO] {
+        struct R: Decodable { let messages: [MessageDTO] }
+        let req = try makeRequest("/conversations/\(conversationId)/messages?after_id=\(afterId)", method: "GET")
+        return try await send(req, as: R.self).messages
+    }
+
+    @discardableResult
+    func sendMessage(conversationId: Int, kind: String = "text", content: String) async throws -> MessageDTO {
+        let req = try makeRequest("/conversations/\(conversationId)/messages", method: "POST",
+                                  body: ["kind": kind, "content": content])
+        return try await send(req, as: MessageDTO.self)
+    }
+
+    func markConversationRead(conversationId: Int) async throws {
+        let req = try makeRequest("/conversations/\(conversationId)/read", method: "POST")
+        _ = try await URLSession.shared.data(for: req)
+    }
+
     // MARK: 流式对话（SSE）
 
     /// 调 /chat/stream，逐增量回调文本片段。companionId 不为空则后端注入其记忆并自动提取。

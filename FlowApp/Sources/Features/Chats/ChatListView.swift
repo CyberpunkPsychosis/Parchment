@@ -4,32 +4,61 @@ struct ChatListView: View {
     @EnvironmentObject var loc: Localization
     @EnvironmentObject var auth: AuthStore
     @State private var showProfile = false
+    @State private var conversations: [ConversationDTO] = []
+    @State private var loaded = false
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
                 header
-                ScrollView {
-                    LazyVStack(spacing: 14) {
-                        ForEach(Array(MockData.chats.enumerated()), id: \.element.id) { idx, chat in
-                            NavigationLink(value: chat) {
-                                ChatRowView(chat: chat, seed: UInt64(idx + 1))
+                if loaded && conversations.isEmpty {
+                    emptyState
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 14) {
+                            ForEach(Array(conversations.enumerated()), id: \.element.id) { idx, conv in
+                                NavigationLink(value: conv) {
+                                    ChatRowView(chat: conv.asSummary, seed: UInt64(idx + 1))
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
                         }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 14)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 14)
                 }
             }
             .background(PaperBackground())
-            .navigationDestination(for: ChatSummary.self) { chat in
-                ChatDetailView(chat: chat)
+            .navigationDestination(for: ConversationDTO.self) { conv in
+                ConversationView(conversation: conv)
             }
+        }
+        .task { await reload() }
+        .onReceive(NotificationCenter.default.publisher(for: .flowMessage)) { _ in
+            Task { await reload() }
         }
         .sheet(isPresented: $showProfile) {
             ProfileView().environmentObject(loc).environmentObject(auth)
         }
+    }
+
+    private func reload() async {
+        if let cs = try? await APIClient.shared.listConversations() {
+            await MainActor.run { conversations = cs; loaded = true }
+        } else {
+            await MainActor.run { loaded = true }
+        }
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 10) {
+            Spacer()
+            Image(systemName: "bubble.left.and.bubble.right")
+                .font(.system(size: 34)).foregroundStyle(FlowTheme.gray.opacity(0.6))
+            Text(loc.t("chats.empty")).font(FlowTheme.caption(14)).foregroundStyle(FlowTheme.gray)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var profileInitials: String {

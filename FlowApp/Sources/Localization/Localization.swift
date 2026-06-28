@@ -30,6 +30,8 @@ final class Localization: ObservableObject {
         "nav.settings":    [.zh: "设置", .en: "Settings"],
         // Chats
         "chats.title":     [.zh: "我的聊天", .en: "My Chats"],
+        "chats.empty":     [.zh: "还没有会话，去发现/群组里开始聊天吧", .en: "No chats yet — start one from Discover/Groups"],
+        "conv.members":    [.zh: "位成员", .en: "members"],
         "chats.preview":   [.zh: "最近一条消息预览…", .en: "Last message preview."],
         "status.online":   [.zh: "在线", .en: "Online"],
         "status.offline":  [.zh: "离线", .en: "Offline"],
