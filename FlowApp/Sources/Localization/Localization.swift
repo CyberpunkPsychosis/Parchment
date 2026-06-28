@@ -221,7 +221,7 @@ final class Localization: ObservableObject {
         "quick.aiName":        [.zh: "羊皮纸助手", .en: "Parchment Assistant"],
         "quick.aiGreeting":    [.zh: "嗨，我是羊皮纸助手，有什么可以帮你？", .en: "Hi! I'm the Parchment assistant. How can I help?"],
         "assistant.entry":     [.zh: "问羊皮纸助手 · 帮你发消息、总结群…", .en: "Ask Parchment · send, summarize…"],
-        "assistant.examples":  [.zh: "试试：把「周末爬山」发到家庭群 · 总结下工作群 · 发条朋友圈", .en: "Try: send to a group · summarize a group · post a moment"],
+        "assistant.examples":  [.zh: "试试：把「周末爬山」发到家庭群 · 总结下工作群 · 分析今天朋友圈谁想出去玩 · 搜下今天的新闻", .en: "Try: send to a group · summarize a group · analyze today's moments · search the web"],
         "assistant.placeholder": [.zh: "想让我帮你做什么…", .en: "What can I do for you…"],
         "assistant.willSend":  [.zh: "发到 ", .en: "Send to "],
         "assistant.willPost":  [.zh: "发这条到朋友圈", .en: "Post this moment"],

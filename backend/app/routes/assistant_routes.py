@@ -1,8 +1,11 @@
 """羊皮纸助手：自然语言 → 站内动作。
 MVP 工具：answer（直接回答）/ send_message（发到某会话）/ post_moment（发朋友圈）/ summarize（总结某群）。
 有副作用的动作（发消息/发朋友圈）只返回"提案"，由客户端确认后再调既有接口执行；
-只读动作（总结/回答）后端直接给结果。暂不联网。"""
+只读动作（总结/回答/分析/联网搜索）后端直接给结果。联网搜索复用智谱 web-search-pro。"""
+import os
 import json
+import uuid
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -15,6 +18,48 @@ from ..usage import consume
 from .messaging_routes import conv_dict, serialize_message
 
 router = APIRouter(tags=["assistant"])
+
+_ZHIPU_TOOLS_URL = "https://open.bigmodel.cn/api/paas/v4/tools"
+
+
+async def _web_search(query: str) -> str | None:
+    """复用智谱 web-search-pro 联网搜索（沿用 ZHIPU_API_KEY，无需新 key）。失败/未配 key 返回 None。"""
+    key = os.getenv("ZHIPU_API_KEY", "").strip()
+    if not key or not query.strip():
+        return None
+    payload = {"request_id": uuid.uuid4().hex, "tool": "web-search-pro",
+               "stream": False, "messages": [{"role": "user", "content": query.strip()}]}
+    try:
+        async with httpx.AsyncClient(timeout=30.0, trust_env=False) as client:
+            r = await client.post(_ZHIPU_TOOLS_URL, json=payload,
+                                  headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
+            if r.status_code != 200:
+                return None
+            data = r.json()
+    except (httpx.HTTPError, ValueError):
+        return None
+    found: list = []
+
+    def collect(o):
+        if isinstance(o, dict):
+            sr = o.get("search_result")
+            if isinstance(sr, list):
+                found.extend(sr)
+            for v in o.values():
+                collect(v)
+        elif isinstance(o, list):
+            for v in o:
+                collect(v)
+    collect(data)
+    lines = []
+    for it in found[:5]:
+        if not isinstance(it, dict):
+            continue
+        title = (it.get("title") or "").strip()
+        content = (it.get("content") or it.get("snippet") or "").strip()[:300]
+        link = (it.get("link") or it.get("url") or "").strip()
+        lines.append(f"- {title}\n  {content}\n  {link}")
+    return "\n".join(lines) if lines else None
 
 
 def _my_conversations(db: Session, uid: int) -> list[dict]:
@@ -55,6 +100,7 @@ _SYS = """你是「羊皮纸助手」，帮用户在 App 内办事。根据用�
 - 总结/回顾某个群最近聊了什么 → {"action":"summarize","target":"群名","say":"好的，我看看"}
 - 分析最近的朋友圈/动态（如"今天谁想出去玩""大家最近在聊啥"）→ {"action":"analyze_moments","say":"好的，我看看朋友圈"}
 - 分析社群广场最近都有什么群/什么内容 → {"action":"analyze_plaza","say":"好的，我看看社群广场"}
+- 需要查最新资讯/上网搜（如"搜下今天的新闻""查查XX是什么"）→ {"action":"search","query":"搜索关键词","say":"我去查查"}
 规则：target 必须从【会话列表】里选最匹配的名字；想不出具体动作就用 answer。say 用中文、简短自然。
 【会话列表】：%s"""
 
@@ -143,6 +189,16 @@ async def act(body: ActIn, user: User = Depends(get_current_user), db: Session =
             f"用户的要求：{body.text}\n\n下面是社群广场最近的群，请据此分析最近都流行/聚集了什么内容：\n"
             + "\n".join(lines)}], system="你是羊皮纸助手，帮用户洞察社群广场的趋势，简洁。")
         return {"kind": "analyze", "say": result.strip() or (say or "我看完啦～")}
+
+    if action == "search":
+        q = (plan.get("query") or body.text).strip()
+        results = await _web_search(q)
+        if not results:
+            return {"kind": "answer", "say": "联网搜索现在没查到结果（或后端未配置智谱 ZHIPU_API_KEY）。"}
+        answer = await complete_chat(tier, [{"role": "user", "content":
+            f"用户的问题：{body.text}\n\n下面是联网搜到的资料，请据此简洁回答，并在末尾附 1-3 条来源链接：\n{results}"}],
+            system="你是羊皮纸助手，根据联网搜索结果回答用户，简洁、准确、给出来源。", temperature=0.4)
+        return {"kind": "answer", "say": answer.strip() or "我查到一些资料～"}
 
     # 默认：直接回答
     return {"kind": "answer", "say": say or raw.strip() or "嗯，我在听～"}
