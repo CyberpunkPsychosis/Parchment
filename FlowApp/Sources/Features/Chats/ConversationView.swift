@@ -30,9 +30,15 @@ struct ConversationView: View {
     @State private var forwardingMsg: MessageDTO?
     @StateObject private var recorder = AudioRecorder()
     @State private var showBgPicker = false
+    @State private var showMemories = false
+    @State private var editCompanion: Companion?
 
     private var myId: Int? { auth.user?.id }
     private var aiMembers: [ConvMemberDTO] { members.filter { $0.is_ai } }
+    /// 搭子 1:1 会话对应的搭子 id（用于查看记忆 / 编辑搭子）。
+    private var companionId: Int? {
+        conversation.type == "companion" ? aiMembers.first?.companion_id : nil
+    }
 
     /// 输入 @ 后的候选成员（含搭子），按当前查询前缀过滤。
     private var mentionCandidates: [ConvMemberDTO] {
@@ -129,6 +135,14 @@ struct ConversationView: View {
                 .environmentObject(loc)
         }
         .sheet(isPresented: $showBgPicker) { ChatBackgroundPicker().environmentObject(loc) }
+        .sheet(isPresented: $showMemories) {
+            if let cid = companionId {
+                MemoriesView(companionId: cid, companionName: conversation.title).environmentObject(loc)
+            }
+        }
+        .sheet(item: $editCompanion) { c in
+            CreateCompanionView(editing: c) { _ in }.environmentObject(loc)
+        }
         .onChange(of: photoItem) { _, item in
             guard let item else { return }
             Task {
@@ -204,6 +218,17 @@ struct ConversationView: View {
             draft += "@\(name) "
         }
         mentionQuery = nil
+    }
+
+    /// 打开「编辑搭子」：按 companionId 取回完整搭子对象再进编辑页（认领的也能改）。
+    private func openEditCompanion() {
+        guard let cid = companionId else { return }
+        Task {
+            let list = (try? await APIClient.shared.listCompanions()) ?? []
+            if let c = list.first(where: { $0.id == cid }) {
+                await MainActor.run { editCompanion = c }
+            }
+        }
     }
 
     /// 松开麦克风：停止录音→上传→发送语音消息。
@@ -318,12 +343,20 @@ struct ConversationView: View {
             }
             Spacer()
             Menu {
-                Button { showAddAI = true } label: { Label(loc.t("conv.addAI"), systemImage: "sparkles") }
-                Button { showShareCompanion = true } label: { Label(loc.t("conv.shareCompanion"), systemImage: "person.crop.rectangle") }
-                Button { showBgPicker = true } label: { Label(loc.t("bg.title"), systemImage: "photo.on.rectangle") }
-                Button { runSuggest() } label: { Label(loc.t("conv.smartReply"), systemImage: "wand.and.stars") }
-                if conversation.is_group {
-                    Button { showMembers = true } label: { Label(loc.t("conv.members.manage"), systemImage: "person.2") }
+                if conversation.type == "companion" {
+                    // 搭子 1:1：给搭子专属菜单（查看记忆 / 编辑搭子），而非群组那套
+                    Button { showMemories = true } label: { Label(loc.t("memories.title"), systemImage: "brain.head.profile") }
+                    Button { openEditCompanion() } label: { Label(loc.t("companion.edit"), systemImage: "pencil") }
+                    Button { showBgPicker = true } label: { Label(loc.t("bg.title"), systemImage: "photo.on.rectangle") }
+                    Button { runSuggest() } label: { Label(loc.t("conv.smartReply"), systemImage: "wand.and.stars") }
+                } else {
+                    Button { showAddAI = true } label: { Label(loc.t("conv.addAI"), systemImage: "sparkles") }
+                    Button { showShareCompanion = true } label: { Label(loc.t("conv.shareCompanion"), systemImage: "person.crop.rectangle") }
+                    Button { showBgPicker = true } label: { Label(loc.t("bg.title"), systemImage: "photo.on.rectangle") }
+                    Button { runSuggest() } label: { Label(loc.t("conv.smartReply"), systemImage: "wand.and.stars") }
+                    if conversation.is_group {
+                        Button { showMembers = true } label: { Label(loc.t("conv.members.manage"), systemImage: "person.2") }
+                    }
                 }
             } label: {
                 Image(systemName: "ellipsis.circle").font(.system(size: 20)).foregroundStyle(FlowTheme.ink)
