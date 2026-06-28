@@ -469,6 +469,12 @@ final class APIClient {
         return try await send(req, as: R.self).friends
     }
 
+    func search(_ q: String) async throws -> SearchResults {
+        let enc = q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? q
+        let req = try makeRequest("/search?q=\(enc)", method: "GET")
+        return try await send(req, as: SearchResults.self)
+    }
+
     // MARK: 朋友圈 / 动态 + 推送
 
     func momentsFeed() async throws -> [MomentPost] {

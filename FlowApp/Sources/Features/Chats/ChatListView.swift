@@ -8,6 +8,7 @@ struct ChatListView: View {
     @State private var showFriends = false
     @State private var showCreateGroup = false
     @State private var showAddFriend = false
+    @State private var showSearch = false
     @State private var conversations: [ConversationDTO] = []
     @State private var loaded = false
 
@@ -59,6 +60,7 @@ struct ChatListView: View {
         .sheet(isPresented: $showFriends) { ContactsView() }
         .sheet(isPresented: $showCreateGroup) { CreateGroupView { _ in Task { await reload() } } }
         .sheet(isPresented: $showAddFriend) { AddFriendView() }
+        .sheet(isPresented: $showSearch) { SearchView() }
     }
 
     private func reload() async {
@@ -106,6 +108,7 @@ struct ChatListView: View {
                 Button { showFriends = true } label: { Label(loc.t("new.chat"), systemImage: "bubble.left") }
                 Button { showCreateGroup = true } label: { Label(loc.t("new.group"), systemImage: "person.3") }
                 Button { showAddFriend = true } label: { Label(loc.t("friends.add"), systemImage: "person.badge.plus") }
+                Button { showSearch = true } label: { Label(loc.t("new.search"), systemImage: "magnifyingglass") }
             } label: {
                 Image(systemName: "plus.circle")
                     .font(.system(size: 22, weight: .medium))

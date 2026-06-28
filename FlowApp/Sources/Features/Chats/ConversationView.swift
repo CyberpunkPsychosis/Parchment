@@ -358,29 +358,43 @@ struct ConvBubble: View {
     }
 }
 
-/// AI 搭子名片消息卡片（kind=companion）。
+/// AI 搭子名片消息卡片（kind=companion）。已发布的可一键认领。
 struct CompanionCard: View {
+    @EnvironmentObject var loc: Localization
     let json: String
-    private var info: (name: String, avatar: String, tint: String, persona: String) {
-        guard let d = json.data(using: .utf8),
-              let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else {
-            return ("搭子", "AI", "teal", "")
-        }
-        return (o["name"] as? String ?? "搭子", o["avatar"] as? String ?? "AI",
-                o["tint"] as? String ?? "teal", o["persona"] as? String ?? "")
+    @State private var adopted = false
+
+    private var o: [String: Any] {
+        (json.data(using: .utf8).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }) ?? [:]
     }
     var body: some View {
-        let i = info
+        let name = o["name"] as? String ?? "搭子"
+        let avatar = o["avatar"] as? String ?? "AI"
+        let tint = o["tint"] as? String ?? "teal"
+        let persona = o["persona"] as? String ?? ""
+        let snapshot = o["snapshot_id"] as? Int
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
-                Avatar(initials: i.avatar, tint: FlowTheme.tint(i.tint), size: 40)
+                Avatar(initials: avatar, tint: FlowTheme.tint(tint), size: 40)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(i.name).font(.system(size: 15, weight: .semibold)).foregroundStyle(FlowTheme.ink)
+                    Text(name).font(.system(size: 15, weight: .semibold)).foregroundStyle(FlowTheme.ink)
                     Text("🤖 AI 搭子名片").font(FlowTheme.caption(11)).foregroundStyle(FlowTheme.gray)
                 }
             }
-            if !i.persona.isEmpty {
-                Text(i.persona).font(FlowTheme.caption(12)).foregroundStyle(FlowTheme.gray).lineLimit(3)
+            if !persona.isEmpty {
+                Text(persona).font(FlowTheme.caption(12)).foregroundStyle(FlowTheme.gray).lineLimit(3)
+            }
+            if let sid = snapshot {
+                Button {
+                    adopted = true
+                    Task { _ = try? await APIClient.shared.adopt(snapshotId: sid) }
+                } label: {
+                    Text(loc.t(adopted ? "market.adopted" : "market.adopt"))
+                        .font(.system(size: 12, weight: .semibold)).foregroundStyle(.white)
+                        .frame(maxWidth: .infinity).padding(.vertical, 7)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(FlowTheme.teal))
+                }
+                .disabled(adopted)
             }
         }
         .padding(14).frame(width: 220, alignment: .leading)

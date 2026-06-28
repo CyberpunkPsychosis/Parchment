@@ -469,7 +469,8 @@ async def share_companion(cid: int, body: ShareCompanionIn,
     if not c:
         raise HTTPException(status_code=404, detail="搭子不存在")
     card = json.dumps({"companion_id": c.id, "name": c.name, "avatar": c.avatar,
-                       "tint": c.tint, "persona": c.persona, "owner_id": c.owner_id},
+                       "tint": c.tint, "persona": c.persona, "owner_id": c.owner_id,
+                       "snapshot_id": c.published_snapshot_id},  # 已发布则可被认领
                       ensure_ascii=False)
     m = Message(conversation_id=cid, sender_user_id=user.id, kind="companion", content=card)
     db.add(m); db.commit(); db.refresh(m)

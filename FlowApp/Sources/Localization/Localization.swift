@@ -171,6 +171,11 @@ final class Localization: ObservableObject {
         "quick.aiName":        [.zh: "FLOW 助手", .en: "FLOW Assistant"],
         "quick.aiGreeting":    [.zh: "嗨，我是 FLOW 助手，有什么可以帮你？", .en: "Hi! I'm the FLOW assistant. How can I help?"],
         "search.placeholder":  [.zh: "搜索", .en: "Search"],
+        "search.hint":      [.zh: "搜索好友 / 群 / 搭子", .en: "Search people / groups / companions"],
+        "search.friends":   [.zh: "好友", .en: "People"],
+        "search.groups":    [.zh: "群组社群", .en: "Groups"],
+        "search.companions":[.zh: "可认领搭子", .en: "Companions"],
+        "new.search":       [.zh: "搜索", .en: "Search"],
         // Auth
         "auth.login":        [.zh: "登录", .en: "Log in"],
         "auth.register":     [.zh: "注册", .en: "Sign up"],
