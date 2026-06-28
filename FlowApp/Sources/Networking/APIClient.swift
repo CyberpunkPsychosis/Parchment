@@ -350,6 +350,16 @@ final class APIClient {
         return try await send(req, as: MessageDTO.self)
     }
 
+    func togglePin(conversationId: Int) async throws {
+        let req = try makeRequest("/conversations/\(conversationId)/pin", method: "POST")
+        _ = try await URLSession.shared.data(for: req)
+    }
+
+    func toggleMute(conversationId: Int) async throws {
+        let req = try makeRequest("/conversations/\(conversationId)/mute", method: "POST")
+        _ = try await URLSession.shared.data(for: req)
+    }
+
     func markConversationRead(conversationId: Int) async throws {
         let req = try makeRequest("/conversations/\(conversationId)/read", method: "POST")
         _ = try await URLSession.shared.data(for: req)

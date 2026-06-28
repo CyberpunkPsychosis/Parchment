@@ -3,6 +3,7 @@ import SwiftUI
 struct ChatListView: View {
     @EnvironmentObject var loc: Localization
     @EnvironmentObject var auth: AuthStore
+    @EnvironmentObject var ui: UIState
     @State private var showProfile = false
     @State private var showFriends = false
     @State private var showCreateGroup = false
@@ -21,9 +22,21 @@ struct ChatListView: View {
                         LazyVStack(spacing: 14) {
                             ForEach(Array(conversations.enumerated()), id: \.element.id) { idx, conv in
                                 NavigationLink(value: conv) {
-                                    ChatRowView(chat: conv.asSummary, seed: UInt64(idx + 1))
+                                    ChatRowView(chat: conv.asSummary, seed: UInt64(idx + 1),
+                                                pinned: conv.pinned ?? false, muted: conv.muted ?? false)
                                 }
                                 .buttonStyle(.plain)
+                                .contextMenu {
+                                    Button { act { try await APIClient.shared.togglePin(conversationId: conv.id) } } label: {
+                                        Label(loc.t((conv.pinned ?? false) ? "conv.unpin" : "conv.pin"), systemImage: "pin")
+                                    }
+                                    Button { act { try await APIClient.shared.toggleMute(conversationId: conv.id) } } label: {
+                                        Label(loc.t((conv.muted ?? false) ? "conv.unmute" : "conv.mute"), systemImage: "bell.slash")
+                                    }
+                                    Button(role: .destructive) { act { try await APIClient.shared.leaveConversation(conv.id) } } label: {
+                                        Label(loc.t("conv.delete"), systemImage: "trash")
+                                    }
+                                }
                             }
                         }
                         .padding(.horizontal, 16)
@@ -50,10 +63,18 @@ struct ChatListView: View {
 
     private func reload() async {
         if let cs = try? await APIClient.shared.listConversations() {
-            await MainActor.run { conversations = cs; loaded = true }
+            await MainActor.run {
+                conversations = cs; loaded = true
+                ui.unreadTotal = cs.reduce(0) { $0 + $1.unread }
+            }
         } else {
             await MainActor.run { loaded = true }
         }
+    }
+
+    /// 执行一个会话操作后刷新列表。
+    private func act(_ op: @escaping () async throws -> Void) {
+        Task { try? await op(); await reload() }
     }
 
     private var emptyState: some View {
@@ -100,15 +121,21 @@ struct ChatListView: View {
 struct ChatRowView: View {
     let chat: ChatSummary
     var seed: UInt64 = 1
+    var pinned: Bool = false
+    var muted: Bool = false
 
     var body: some View {
         HStack(spacing: 12) {
             Avatar(initials: chat.initials, tint: chat.tint, size: 46, imageURL: chat.imageURL)
             VStack(alignment: .leading, spacing: 3) {
-                Text(chat.name)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(FlowTheme.ink)
-                    .lineLimit(1)
+                HStack(spacing: 5) {
+                    Text(chat.name)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(FlowTheme.ink)
+                        .lineLimit(1)
+                    if muted { Image(systemName: "bell.slash.fill").font(.system(size: 10)).foregroundStyle(FlowTheme.gray) }
+                    if pinned { Image(systemName: "pin.fill").font(.system(size: 10)).foregroundStyle(FlowTheme.teal) }
+                }
                 Text(chat.preview)
                     .font(FlowTheme.caption(13))
                     .foregroundStyle(FlowTheme.gray)

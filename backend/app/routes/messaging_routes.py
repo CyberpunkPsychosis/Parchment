@@ -229,7 +229,31 @@ def list_conversations(user: User = Depends(get_current_user), db: Session = Dep
            .filter(ConversationMember.user_id == user.id).all()]
     rows = (db.query(Conversation).filter(Conversation.id.in_(ids))
             .order_by(Conversation.updated_at.desc()).all() if ids else [])
-    return {"conversations": [conv_dict(db, c, user.id) for c in rows]}
+    out = [conv_dict(db, c, user.id) for c in rows]
+    # 时间新→旧，再把置顶稳定提前
+    out.sort(key=lambda d: d["time"], reverse=True)
+    out.sort(key=lambda d: 0 if d.get("pinned") else 1)
+    return {"conversations": out}
+
+
+@router.post("/conversations/{cid}/pin")
+def toggle_pin(cid: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    m = db.query(ConversationMember).filter(
+        ConversationMember.conversation_id == cid, ConversationMember.user_id == user.id).first()
+    if not m:
+        raise HTTPException(status_code=403, detail="无权访问")
+    m.pinned = not bool(m.pinned); db.commit()
+    return {"pinned": bool(m.pinned)}
+
+
+@router.post("/conversations/{cid}/mute")
+def toggle_mute(cid: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    m = db.query(ConversationMember).filter(
+        ConversationMember.conversation_id == cid, ConversationMember.user_id == user.id).first()
+    if not m:
+        raise HTTPException(status_code=403, detail="无权访问")
+    m.muted = not bool(m.muted); db.commit()
+    return {"muted": bool(m.muted)}
 
 
 class NewConversation(BaseModel):

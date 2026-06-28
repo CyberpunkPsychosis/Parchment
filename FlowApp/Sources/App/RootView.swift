@@ -55,6 +55,7 @@ struct RootView: View {
 
 struct FlowTabBar: View {
     @EnvironmentObject var loc: Localization
+    @EnvironmentObject var ui: UIState
     @Binding var tab: FlowTab
 
     var body: some View {
@@ -64,6 +65,14 @@ struct FlowTabBar: View {
                     VStack(spacing: 3) {
                         Image(systemName: t.icon)
                             .font(.system(size: 18, weight: .medium))
+                            .overlay(alignment: .topTrailing) {
+                                if t == .chats && ui.unreadTotal > 0 {
+                                    Text(ui.unreadTotal > 99 ? "99+" : "\(ui.unreadTotal)")
+                                        .font(.system(size: 9, weight: .bold)).foregroundStyle(.white)
+                                        .padding(.horizontal, 4).padding(.vertical, 1)
+                                        .background(Capsule().fill(.red)).offset(x: 12, y: -6)
+                                }
+                            }
                         Text(loc.t(t.key))
                             .font(.system(size: 10, weight: .medium))
                     }
