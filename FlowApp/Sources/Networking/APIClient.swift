@@ -344,6 +344,47 @@ final class APIClient {
         _ = try await URLSession.shared.data(for: req)
     }
 
+    // MARK: 好友
+
+    func searchUsers(_ q: String) async throws -> [FriendUser] {
+        struct R: Decodable { let users: [FriendUser] }
+        let enc = q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? q
+        let req = try makeRequest("/users/search?q=\(enc)", method: "GET")
+        return try await send(req, as: R.self).users
+    }
+
+    func userProfile(_ id: Int) async throws -> FriendUser {
+        let req = try makeRequest("/users/\(id)", method: "GET")
+        return try await send(req, as: FriendUser.self)
+    }
+
+    func sendFriendRequest(toUserId: Int) async throws {
+        let req = try makeRequest("/friends/request", method: "POST", body: ["to_user_id": toUserId])
+        _ = try await URLSession.shared.data(for: req)
+    }
+
+    func listFriendRequests() async throws -> [IncomingRequest] {
+        struct R: Decodable { let requests: [IncomingRequest] }
+        let req = try makeRequest("/friends/requests", method: "GET")
+        return try await send(req, as: R.self).requests
+    }
+
+    func acceptFriendRequest(id: Int) async throws {
+        let req = try makeRequest("/friends/requests/\(id)/accept", method: "POST")
+        _ = try await URLSession.shared.data(for: req)
+    }
+
+    func rejectFriendRequest(id: Int) async throws {
+        let req = try makeRequest("/friends/requests/\(id)/reject", method: "POST")
+        _ = try await URLSession.shared.data(for: req)
+    }
+
+    func listFriends() async throws -> [FriendUser] {
+        struct R: Decodable { let friends: [FriendUser] }
+        let req = try makeRequest("/friends", method: "GET")
+        return try await send(req, as: R.self).friends
+    }
+
     // MARK: 流式对话（SSE）
 
     /// 调 /chat/stream，逐增量回调文本片段。companionId 不为空则后端注入其记忆并自动提取。

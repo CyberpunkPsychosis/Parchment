@@ -4,6 +4,7 @@ struct ChatListView: View {
     @EnvironmentObject var loc: Localization
     @EnvironmentObject var auth: AuthStore
     @State private var showProfile = false
+    @State private var showNewChat = false
     @State private var conversations: [ConversationDTO] = []
     @State private var loaded = false
 
@@ -40,6 +41,7 @@ struct ChatListView: View {
         .sheet(isPresented: $showProfile) {
             ProfileView().environmentObject(loc).environmentObject(auth)
         }
+        .sheet(isPresented: $showNewChat) { ContactsView() }
     }
 
     private func reload() async {
@@ -75,9 +77,11 @@ struct ChatListView: View {
                 .font(FlowTheme.title(30))
                 .foregroundStyle(FlowTheme.ink)
             Spacer()
-            Image(systemName: "square.and.pencil")
-                .font(.system(size: 20, weight: .medium))
-                .foregroundStyle(FlowTheme.ink)
+            Button { showNewChat = true } label: {
+                Image(systemName: "square.and.pencil")
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(FlowTheme.ink)
+            }
         }
         .padding(.horizontal, 20)
         .padding(.top, 14)
