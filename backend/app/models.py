@@ -239,6 +239,50 @@ class Message(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
+class Post(Base):
+    """朋友圈动态。"""
+    __tablename__ = "posts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    author_id = Column(Integer, index=True, nullable=False)
+    author_name = Column(String, nullable=False, default="")
+    content = Column(String, nullable=False, default="")
+    image_url = Column(String, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class PostLike(Base):
+    __tablename__ = "post_likes"
+    __table_args__ = (UniqueConstraint("post_id", "user_id", name="uq_post_like"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    post_id = Column(Integer, index=True, nullable=False)
+    user_id = Column(Integer, index=True, nullable=False)
+
+
+class PostComment(Base):
+    __tablename__ = "post_comments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    post_id = Column(Integer, index=True, nullable=False)
+    user_id = Column(Integer, index=True, nullable=False)
+    user_name = Column(String, nullable=False, default="")
+    content = Column(String, nullable=False, default="")
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class DeviceToken(Base):
+    """推送设备 token（APNs）。真实投递需配置 Apple 推送密钥。"""
+    __tablename__ = "device_tokens"
+    __table_args__ = (UniqueConstraint("token", name="uq_device_token"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, index=True, nullable=False)
+    token = Column(String, nullable=False)
+    platform = Column(String, nullable=False, default="ios")
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
 class Sticker(Base):
     __tablename__ = "stickers"
 

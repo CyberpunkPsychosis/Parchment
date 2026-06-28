@@ -180,9 +180,18 @@ manager = ConnectionManager()
 
 
 async def broadcast_message(db: Session, conv: Conversation, m: Message):
-    payload = {"type": "message", "conversation_id": conv.id,
-               "message": serialize_message(db, m)}
-    await manager.send_to_users(member_ids(db, conv.id), payload)
+    info = serialize_message(db, m)
+    payload = {"type": "message", "conversation_id": conv.id, "message": info}
+    uids = member_ids(db, conv.id)
+    await manager.send_to_users(uids, payload)
+    # 离线成员推送（未配 APNs 凭证时为 no-op）
+    try:
+        from ..push import send_push
+        offline = [u for u in uids if u != m.sender_user_id and u not in manager.active]
+        if offline:
+            send_push(db, offline, info["sender_name"], info["content"][:60])
+    except Exception:
+        pass
 
 
 @router.websocket("/ws")
