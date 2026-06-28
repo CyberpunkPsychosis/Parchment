@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+httpx
+socksio
+sqlalchemy
+pyjwt
+bcrypt
+python-dotenv
+pydantic[email]

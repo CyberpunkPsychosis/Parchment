@@ -5,7 +5,7 @@ struct CheckBox: View {
     let checked: Bool
     var body: some View {
         RoundedRectangle(cornerRadius: 6)
-            .fill(checked ? FlowTheme.teal : Color(hex: 0xFDFCF7))
+            .fill(checked ? FlowTheme.teal : FlowTheme.field)
             .frame(width: 23, height: 23)
             .overlay {
                 if checked {
@@ -49,7 +49,7 @@ struct ContactsView: View {
                         .font(FlowTheme.body(15))
                 }
                 .padding(.horizontal, 14).padding(.vertical, 12)
-                .background(RoundedRectangle(cornerRadius: 14).fill(Color(hex: 0xFDFCF7)))
+                .background(RoundedRectangle(cornerRadius: 14).fill(FlowTheme.field))
                 .sketchBorder(14, width: 1.4, seed: 70)
 
                 ScrollView {

@@ -1,0 +1,14 @@
+{
+  "_comment": "模型池：每个档位是一个【有序】列表，主用在前、备用在后。后端按顺序尝试，主模型挂了/超时/没配 key 就自动切下一个，用户无感。改这个文件即时生效，无需重启或改代码。key_env 指向 .env 里的环境变量名。",
+  "free": [
+    { "provider": "zhipu", "base_url": "https://open.bigmodel.cn/api/paas/v4", "model": "glm-4-flash", "key_env": "ZHIPU_API_KEY" }
+  ],
+  "pro": [
+    { "provider": "deepseek", "base_url": "https://api.deepseek.com", "model": "deepseek-v4-flash", "key_env": "DEEPSEEK_API_KEY" },
+    { "provider": "zhipu", "base_url": "https://open.bigmodel.cn/api/paas/v4", "model": "glm-4-flash", "key_env": "ZHIPU_API_KEY" },
+    { "provider": "zhipu", "base_url": "https://open.bigmodel.cn/api/paas/v4", "model": "glm-4.6", "key_env": "ZHIPU_API_KEY" }
+  ],
+  "image": [
+    { "provider": "zhipu", "base_url": "https://open.bigmodel.cn/api/paas/v4", "model": "cogview-3-flash", "key_env": "ZHIPU_API_KEY", "format": "openai_image" }
+  ]
+}

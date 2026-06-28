@@ -2,6 +2,8 @@ import SwiftUI
 
 struct ChatListView: View {
     @EnvironmentObject var loc: Localization
+    @EnvironmentObject var auth: AuthStore
+    @State private var showProfile = false
 
     var body: some View {
         NavigationStack {
@@ -25,10 +27,21 @@ struct ChatListView: View {
                 ChatDetailView(chat: chat)
             }
         }
+        .sheet(isPresented: $showProfile) {
+            ProfileView().environmentObject(loc).environmentObject(auth)
+        }
+    }
+
+    private var profileInitials: String {
+        let name = auth.user?.nickname ?? "U"
+        return String(name.prefix(name.first.map { $0.isASCII ? 2 : 1 } ?? 1)).uppercased()
     }
 
     private var header: some View {
-        HStack {
+        HStack(spacing: 12) {
+            Button { showProfile = true } label: {
+                Avatar(initials: profileInitials, tint: FlowTheme.teal, size: 38, seed: 7)
+            }
             Text(loc.t("chats.title"))
                 .font(FlowTheme.title(30))
                 .foregroundStyle(FlowTheme.ink)

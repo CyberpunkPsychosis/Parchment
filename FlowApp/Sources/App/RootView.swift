@@ -1,14 +1,14 @@
 import SwiftUI
 
 enum FlowTab: String, CaseIterable {
-    case chats, groups, discover, profile, settings
+    case chats, companions, groups, discover, settings
     var icon: String {
         switch self {
-        case .chats:    return "bubble.left.fill"
-        case .groups:   return "person.2.fill"
-        case .discover: return "safari.fill"
-        case .profile:  return "person.crop.circle"
-        case .settings: return "gearshape.fill"
+        case .chats:      return "bubble.left.fill"
+        case .companions: return "sparkles"
+        case .groups:     return "person.2.fill"
+        case .discover:   return "safari.fill"
+        case .settings:   return "gearshape.fill"
         }
     }
     var key: String { "nav.\(rawValue)" }
@@ -16,25 +16,40 @@ enum FlowTab: String, CaseIterable {
 
 struct RootView: View {
     @EnvironmentObject var loc: Localization
+    @EnvironmentObject var ui: UIState
     @State private var tab: FlowTab = .chats
 
     var body: some View {
-        VStack(spacing: 0) {
-            ZStack {
-                switch tab {
-                case .chats:    ChatListView()
-                case .groups:   GroupsView()
-                case .discover: DiscoverView()
-                case .profile:  ProfileView()
-                case .settings: SettingsView()
+        // 所有页签常驻内存，用透明度切换，避免切走再回来时 @State(会话/输入)被销毁
+        ZStack {
+            tabContent(.chats) { ChatListView() }
+            tabContent(.companions) { CompanionsView() }
+            tabContent(.groups) { GroupsView() }
+            tabContent(.discover) { DiscoverView() }
+            tabContent(.settings) { SettingsView() }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // 菜单作为底部安全区 inset：收起时内容区（含聊天输入栏）跟着平滑下移，联动一致
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if !ui.hideTabBar {
+                VStack(spacing: 0) {
+                    FlowTabBar(tab: $tab)
+                    StatusFooter()
                 }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            FlowTabBar(tab: $tab)
-            StatusFooter()
         }
         .background(PaperBackground())
+        .animation(.easeInOut(duration: 0.28), value: ui.hideTabBar)
+    }
+
+    /// 常驻渲染每个页签，仅用透明度/命中测试切换可见性（保活 @State）。
+    @ViewBuilder
+    private func tabContent<V: View>(_ t: FlowTab, @ViewBuilder _ view: () -> V) -> some View {
+        view()
+            .opacity(tab == t ? 1 : 0)
+            .allowsHitTesting(tab == t)
+            .zIndex(tab == t ? 1 : 0)
     }
 }
 
@@ -66,7 +81,7 @@ struct FlowTabBar: View {
     }
 }
 
-/// Decorative status strip from the design board (Connectivity • 100% • Quick access).
+/// 底部装饰状态条（设计稿原样：已连接 • 100% • 快捷访问）。
 struct StatusFooter: View {
     @EnvironmentObject var loc: Localization
     var body: some View {
@@ -76,12 +91,6 @@ struct StatusFooter: View {
             Spacer()
             Text("100%").font(FlowTheme.caption(11))
             Image(systemName: "battery.100").font(.system(size: 11))
-            Spacer()
-            HStack(spacing: 4) {
-                Avatar(initials: "AC", tint: FlowTheme.teal, size: 16)
-                Text(loc.t("footer.quick")).font(FlowTheme.caption(11))
-                Image(systemName: "chevron.up").font(.system(size: 8))
-            }
         }
         .foregroundStyle(FlowTheme.gray)
         .padding(.horizontal, 18)

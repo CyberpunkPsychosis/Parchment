@@ -20,15 +20,25 @@ struct ChatSummary: Identifiable, Hashable {
 
 enum MessageKind: Hashable {
     case text(String)
-    case image          // uses a sketch placeholder
+    case image              // 设计稿占位图
+    case imageURL(String)   // AI 生成的贴纸（远程 URL）
+    case localImage(Data)   // 用户从相册发的照片（本地）
+    case file(name: String) // 用户发的文件
     case voice(seconds: Int)
 }
 
 struct Message: Identifiable, Hashable {
-    let id = UUID()
-    let kind: MessageKind
+    let id: UUID
+    var kind: MessageKind        // var: 流式时原地更新文本
     let mine: Bool
-    let time: String
+    var time: String
+
+    init(id: UUID = UUID(), kind: MessageKind, mine: Bool, time: String) {
+        self.id = id
+        self.kind = kind
+        self.mine = mine
+        self.time = time
+    }
 }
 
 struct EliteService: Identifiable, Hashable {
