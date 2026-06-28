@@ -7,3 +7,4 @@ pyjwt
 bcrypt
 python-dotenv
 pydantic[email]
+python-multipart

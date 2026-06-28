@@ -405,6 +405,66 @@ async def ai_reply(cid: int, body: AIReplyIn,
     return serialize_message(db, out)
 
 
+class ShareCompanionIn(BaseModel):
+    companion_id: int
+
+
+@router.post("/conversations/{cid}/share-companion")
+async def share_companion(cid: int, body: ShareCompanionIn,
+                          user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    conv = db.query(Conversation).filter(Conversation.id == cid).first()
+    if not conv or not is_member(db, cid, user.id):
+        raise HTTPException(status_code=403, detail="无权访问")
+    c = db.query(Companion).filter(Companion.id == body.companion_id).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="搭子不存在")
+    card = json.dumps({"companion_id": c.id, "name": c.name, "avatar": c.avatar,
+                       "tint": c.tint, "persona": c.persona, "owner_id": c.owner_id},
+                      ensure_ascii=False)
+    m = Message(conversation_id=cid, sender_user_id=user.id, kind="companion", content=card)
+    db.add(m); db.commit(); db.refresh(m)
+    touch(db, conv)
+    await broadcast_message(db, conv, m)
+    return serialize_message(db, m)
+
+
+def _my_role(db: Session, cid: int, uid: int) -> str | None:
+    m = db.query(ConversationMember).filter(
+        ConversationMember.conversation_id == cid, ConversationMember.user_id == uid).first()
+    return m.role if m else None
+
+
+@router.post("/conversations/{cid}/leave")
+def leave_conversation(cid: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    m = db.query(ConversationMember).filter(
+        ConversationMember.conversation_id == cid, ConversationMember.user_id == user.id).first()
+    if m:
+        db.delete(m); db.commit()
+    return {"ok": True}
+
+
+class RemoveMemberIn(BaseModel):
+    user_id: int | None = None
+    companion_id: int | None = None
+
+
+@router.post("/conversations/{cid}/remove-member")
+def remove_member(cid: int, body: RemoveMemberIn,
+                  user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if _my_role(db, cid, user.id) != "owner":
+        raise HTTPException(status_code=403, detail="仅群主可移除成员")
+    q = db.query(ConversationMember).filter(ConversationMember.conversation_id == cid)
+    if body.companion_id:
+        row = q.filter(ConversationMember.companion_id == body.companion_id).first()
+    elif body.user_id and body.user_id != user.id:
+        row = q.filter(ConversationMember.user_id == body.user_id).first()
+    else:
+        row = None
+    if row:
+        db.delete(row); db.commit()
+    return {"ok": True}
+
+
 @router.post("/conversations/{cid}/read")
 def mark_read(cid: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     me = db.query(ConversationMember).filter(
