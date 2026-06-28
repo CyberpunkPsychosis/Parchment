@@ -518,7 +518,10 @@ def add_member(cid: int, body: AddMemberIn,
 
 # 让模型严格扮演 persona 的强约束前缀（chat_routes 与此保持一致）
 PERSONA_DIRECTIVE = ("请始终严格扮演下面设定的角色，全程保持这个角色的性格、语气和说话方式，"
-                     "用第一人称代入，不要跳出角色，也不要自称 AI、助手或语言模型。\n\n角色设定：\n")
+                     "用第一人称代入，不要跳出角色，也不要自称 AI、助手或语言模型。\n"
+                     "像真实的人那样聊天：口语化、短句、有情绪和小口头禅，可以适当用语气词和表情；"
+                     "别像客服或百科那样四平八稳、长篇大论或总结陈词；偶尔可以反问、开玩笑、表达自己的小想法。\n\n"
+                     "角色设定：\n")
 
 
 def _companion_system(db: Session, comp: Companion, group_context: bool = False) -> str:
@@ -695,7 +698,8 @@ async def ai_reply(cid: int, body: AIReplyIn,
             body = m.content if m.kind == "text" else _placeholder.get(m.kind, "[消息]")
             msgs.append({"role": "user", "content": f"{who}：{body}"})
     reply = await complete_chat(tier, msgs or [{"role": "user", "content": "（群里还没消息，请打个招呼）"}],
-                                system=_companion_system(db, comp, group_context=is_group))
+                                system=_companion_system(db, comp, group_context=is_group),
+                                temperature=0.9)   # 搭子聊天调高，更随性、有活人感
     out = Message(conversation_id=cid, sender_companion_id=comp.id, kind="text", content=reply.strip())
     db.add(out)
     leveled = comp.add_exp()   # 互动涨经验（按天封顶）

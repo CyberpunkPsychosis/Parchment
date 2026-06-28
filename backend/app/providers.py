@@ -11,9 +11,10 @@ from .config import pool_for, MAX_CONTEXT_MESSAGES
 
 
 async def stream_chat_events(tier: str, messages: list[dict],
-                             system: str | None = None) -> AsyncGenerator[dict, None]:
+                             system: str | None = None,
+                             temperature: float | None = None) -> AsyncGenerator[dict, None]:
     """逐事件 yield：先 {"meta":{...}} 告知实际使用的模型，再若干 {"delta": "..."}。
-    事件里不暴露 provider 细节给前端展示压力——meta 仅供调试/统计。"""
+    temperature 给"活人感"留口子：搭子聊天调高(更随性)，提取/JSON 任务调低(更稳)。"""
     # 上下文截断，控制输入 token
     trimmed = messages[-MAX_CONTEXT_MESSAGES:]
     full = ([{"role": "system", "content": system}] if system else []) + trimmed
@@ -24,6 +25,8 @@ async def stream_chat_events(tier: str, messages: list[dict],
         url = f'{cfg["base_url"]}/chat/completions'
         headers = {"Authorization": f'Bearer {cfg["api_key"]}', "Content-Type": "application/json"}
         payload = {"model": cfg["model"], "messages": full, "stream": True}
+        if temperature is not None:
+            payload["temperature"] = temperature
         try:
             async with httpx.AsyncClient(timeout=60.0, trust_env=False) as client:
                 async with client.stream("POST", url, headers=headers, json=payload) as resp:
@@ -57,10 +60,11 @@ async def stream_chat_events(tier: str, messages: list[dict],
         yield {"delta": ch}
 
 
-async def complete_chat(tier: str, messages: list[dict], system: str | None = None) -> str:
+async def complete_chat(tier: str, messages: list[dict], system: str | None = None,
+                        temperature: float | None = None) -> str:
     """非流式：收集完整回复（润色/翻译/回复建议用）。同样享受故障转移。"""
     parts = []
-    async for ev in stream_chat_events(tier, messages, system):
+    async for ev in stream_chat_events(tier, messages, system, temperature):
         if "delta" in ev:
             parts.append(ev["delta"])
     return "".join(parts)

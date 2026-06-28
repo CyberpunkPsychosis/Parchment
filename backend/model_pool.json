@@ -1,12 +1,14 @@
 {
-  "_comment": "模型池：每个档位是一个【有序】列表，主用在前、备用在后。后端按顺序尝试，主模型挂了/超时/没配 key 就自动切下一个，用户无感。改这个文件即时生效，无需重启或改代码。key_env 指向 .env 里的环境变量名。",
+  "_comment": "模型池：每档是【有序】列表，主用在前、备用在后。主模型挂了/超时/限流/没配 key 自动顺延，用户无感。改本文件即时生效（热加载），无需重启或改代码。key_env 指向 .env 里的环境变量名；没配 key 的项会被跳过。",
+  "_howto": "免费档默认用智谱 glm-4.7-flash（你已有 ZHIPU_API_KEY）；会员档主用 deepseek-chat，需在 .env 配 DEEPSEEK_API_KEY，没配则自动回落到智谱 glm。想加豆包/MiniMax 再各自补 key。",
   "free": [
+    { "provider": "zhipu", "base_url": "https://open.bigmodel.cn/api/paas/v4", "model": "glm-4.7-flash", "key_env": "ZHIPU_API_KEY" },
     { "provider": "zhipu", "base_url": "https://open.bigmodel.cn/api/paas/v4", "model": "glm-4-flash", "key_env": "ZHIPU_API_KEY" }
   ],
   "pro": [
-    { "provider": "deepseek", "base_url": "https://api.deepseek.com", "model": "deepseek-v4-flash", "key_env": "DEEPSEEK_API_KEY" },
-    { "provider": "zhipu", "base_url": "https://open.bigmodel.cn/api/paas/v4", "model": "glm-4-flash", "key_env": "ZHIPU_API_KEY" },
-    { "provider": "zhipu", "base_url": "https://open.bigmodel.cn/api/paas/v4", "model": "glm-4.6", "key_env": "ZHIPU_API_KEY" }
+    { "provider": "deepseek", "base_url": "https://api.deepseek.com", "model": "deepseek-chat", "key_env": "DEEPSEEK_API_KEY" },
+    { "provider": "zhipu", "base_url": "https://open.bigmodel.cn/api/paas/v4", "model": "glm-4.6", "key_env": "ZHIPU_API_KEY" },
+    { "provider": "zhipu", "base_url": "https://open.bigmodel.cn/api/paas/v4", "model": "glm-4-flash", "key_env": "ZHIPU_API_KEY" }
   ],
   "image": [
     { "provider": "zhipu", "base_url": "https://open.bigmodel.cn/api/paas/v4", "model": "cogview-3-flash", "key_env": "ZHIPU_API_KEY", "format": "openai_image" }

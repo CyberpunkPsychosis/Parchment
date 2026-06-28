@@ -64,9 +64,10 @@ async def chat_stream(body: ChatIn,
 
     last_user = next((m["content"] for m in reversed(msgs) if m["role"] == "user"), "")
 
+    temp = 0.9 if companion is not None else None   # 搭子聊天调高，更有活人感
     async def event_gen():
         reply_parts: list[str] = []
-        async for ev in stream_chat_events(tier, msgs, system=system):
+        async for ev in stream_chat_events(tier, msgs, system=system, temperature=temp):
             if "delta" in ev:
                 reply_parts.append(ev["delta"])
             yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
