@@ -249,6 +249,25 @@ def create_conversation(body: NewConversation,
     raise HTTPException(status_code=400, detail="不支持的会话类型")
 
 
+class NewFriendGroup(BaseModel):
+    name: str = Field(default="", max_length=24)
+    member_ids: list[int] = []
+
+
+@router.post("/conversations/group")
+def create_friend_group(body: NewFriendGroup,
+                        user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """好友内部群：不挂社群(group_id=None)，直接拉好友进会话。"""
+    c = Conversation(type="group", title=body.name.strip() or "群聊")
+    db.add(c); db.commit(); db.refresh(c)
+    db.add(ConversationMember(conversation_id=c.id, user_id=user.id, role="owner"))
+    for uid in set(body.member_ids):
+        if uid != user.id and db.query(User).filter(User.id == uid).first():
+            db.add(ConversationMember(conversation_id=c.id, user_id=uid))
+    db.commit()
+    return conv_dict(db, c, user.id)
+
+
 @router.get("/conversations/{cid}/messages")
 def list_messages(cid: int, after_id: int = 0, limit: int = 50,
                   user: User = Depends(get_current_user), db: Session = Depends(get_db)):

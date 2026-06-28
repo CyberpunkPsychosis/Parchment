@@ -326,6 +326,13 @@ final class APIClient {
         return try await send(req, as: ConversationDTO.self)
     }
 
+    /// 好友内部群（不挂社群）。
+    func createFriendGroup(name: String, memberIds: [Int]) async throws -> ConversationDTO {
+        struct B: Encodable { let name: String; let member_ids: [Int] }
+        let req = try makeRequest("/conversations/group", method: "POST", body: B(name: name, member_ids: memberIds))
+        return try await send(req, as: ConversationDTO.self)
+    }
+
     func listMessages(conversationId: Int, afterId: Int = 0) async throws -> [MessageDTO] {
         struct R: Decodable { let messages: [MessageDTO] }
         let req = try makeRequest("/conversations/\(conversationId)/messages?after_id=\(afterId)", method: "GET")
