@@ -85,6 +85,7 @@ class Companion(Base):
     name = Column(String, nullable=False)
     persona = Column(String, nullable=False, default="")   # system prompt
     avatar = Column(String, nullable=False, default="AI")  # 头像首字
+    avatar_url = Column(String, nullable=True)             # 自定义头像图（可空）
     tint = Column(String, nullable=False, default="teal")  # 颜色 key
     greeting = Column(String, nullable=False, default="")
     # —— 认领（Phase 9）——
@@ -125,7 +126,8 @@ class Companion(Base):
     def public_dict(self, memory_count: int = 0) -> dict:
         return {
             "id": self.id, "name": self.name, "persona": self.persona,
-            "avatar": self.avatar, "tint": self.tint, "greeting": self.greeting,
+            "avatar": self.avatar, "avatar_url": self.avatar_url,
+            "tint": self.tint, "greeting": self.greeting,
             "visibility": self.visibility, "memory_count": memory_count,
             "published": self.published_snapshot_id is not None,
             "adopted": self.forked_from_snapshot_id is not None,

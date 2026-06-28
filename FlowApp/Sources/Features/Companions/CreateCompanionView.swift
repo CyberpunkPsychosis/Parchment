@@ -1,17 +1,35 @@
 import SwiftUI
+import PhotosUI
 
-/// 创建自定义 AI 搭子。
+/// 创建 / 编辑自定义 AI 搭子。
 struct CreateCompanionView: View {
     @EnvironmentObject var loc: Localization
     @Environment(\.dismiss) private var dismiss
-    let onCreated: (Companion) -> Void
+    /// 传入则为「编辑」模式
+    var editing: Companion? = nil
+    let onSaved: (Companion) -> Void
 
-    @State private var name = ""
-    @State private var persona = ""
-    @State private var greeting = ""
-    @State private var tint: CompanionTint = .teal
+    @State private var name: String
+    @State private var persona: String
+    @State private var greeting: String
+    @State private var tint: CompanionTint
+    @State private var avatarURL: String?
+    @State private var photoItem: PhotosPickerItem?
+    @State private var uploading = false
     @State private var saving = false
     @State private var error: String?
+
+    init(editing: Companion? = nil, onSaved: @escaping (Companion) -> Void) {
+        self.editing = editing
+        self.onSaved = onSaved
+        _name = State(initialValue: editing?.name ?? "")
+        _persona = State(initialValue: editing?.persona ?? "")
+        _greeting = State(initialValue: editing?.greeting ?? "")
+        _tint = State(initialValue: CompanionTint(rawValue: editing?.tint ?? "teal") ?? .teal)
+        _avatarURL = State(initialValue: editing?.avatar_url)
+    }
+
+    private var isEditing: Bool { editing != nil }
 
     private var avatarInitials: String {
         let n = name.trimmingCharacters(in: .whitespaces)
@@ -24,14 +42,24 @@ struct CreateCompanionView: View {
             PaperBackground()
             ScrollView {
                 VStack(spacing: 18) {
-                    Avatar(initials: avatarInitials, tint: tint.color, size: 72, seed: 7).padding(.top, 24)
+                    // 头像：点击上传图片
+                    PhotosPicker(selection: $photoItem, matching: .images) {
+                        ZStack(alignment: .bottomTrailing) {
+                            Avatar(initials: avatarInitials, tint: tint.color, size: 72, seed: 7, imageURL: avatarURL)
+                            ZStack {
+                                Circle().fill(FlowTheme.teal).frame(width: 24, height: 24)
+                                Image(systemName: uploading ? "arrow.up" : "camera.fill")
+                                    .font(.system(size: 11)).foregroundStyle(.white)
+                            }
+                        }
+                    }
+                    .padding(.top, 24)
 
                     Card {
                         VStack(spacing: 16) {
                             field(loc.t("companion.name"), text: $name)
                             personaField
                             field(loc.t("companion.greeting"), text: $greeting)
-                            // 配色
                             HStack {
                                 Text(loc.t("companion.tint")).font(FlowTheme.body(15)).foregroundStyle(FlowTheme.ink)
                                 Spacer()
@@ -52,7 +80,7 @@ struct CreateCompanionView: View {
 
                     Button(action: save) {
                         ZStack {
-                            PrimaryButton(title: loc.t("companion.save")).opacity(canSave ? 1 : 0.5)
+                            PrimaryButton(title: loc.t(isEditing ? "companion.update" : "companion.save")).opacity(canSave ? 1 : 0.5)
                             if saving { ProgressView().tint(.white) }
                         }
                     }
@@ -65,6 +93,17 @@ struct CreateCompanionView: View {
             Button { dismiss() } label: {
                 Image(systemName: "xmark.circle.fill").font(.system(size: 26)).foregroundStyle(FlowTheme.gray.opacity(0.6))
             }.padding(16)
+        }
+        .onChange(of: photoItem) { _, item in
+            guard let item else { return }
+            uploading = true
+            Task {
+                if let data = try? await item.loadTransferable(type: Data.self),
+                   let url = try? await APIClient.shared.uploadImage(data) {
+                    await MainActor.run { avatarURL = url }
+                }
+                await MainActor.run { uploading = false; photoItem = nil }
+            }
         }
     }
 
@@ -97,14 +136,22 @@ struct CreateCompanionView: View {
     private func save() {
         saving = true
         error = nil
+        let n = name.trimmingCharacters(in: .whitespaces)
+        let p = persona.trimmingCharacters(in: .whitespaces)
+        let g = greeting.trimmingCharacters(in: .whitespaces)
         Task {
             do {
-                let c = try await APIClient.shared.createCompanion(
-                    name: name.trimmingCharacters(in: .whitespaces),
-                    persona: persona.trimmingCharacters(in: .whitespaces),
-                    avatar: avatarInitials, tint: tint.rawValue,
-                    greeting: greeting.trimmingCharacters(in: .whitespaces))
-                onCreated(c)
+                let c: Companion
+                if let editing {
+                    c = try await APIClient.shared.updateCompanion(
+                        id: editing.id, name: n, persona: p, avatar: avatarInitials,
+                        tint: tint.rawValue, greeting: g, avatarURL: avatarURL)
+                } else {
+                    c = try await APIClient.shared.createCompanion(
+                        name: n, persona: p, avatar: avatarInitials,
+                        tint: tint.rawValue, greeting: g, avatarURL: avatarURL)
+                }
+                onSaved(c)
                 dismiss()
             } catch {
                 self.error = error.localizedDescription

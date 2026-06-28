@@ -9,6 +9,7 @@ struct CompanionsView: View {
     @State private var showCreate = false
     @State private var publishTarget: Companion?
     @State private var detailTarget: Companion?
+    @State private var editTarget: Companion?
 
     var body: some View {
         NavigationStack {
@@ -27,6 +28,9 @@ struct CompanionsView: View {
                                 .contextMenu {
                                     Button { detailTarget = c } label: {
                                         Label(loc.t("growth.profile"), systemImage: "chart.line.uptrend.xyaxis")
+                                    }
+                                    Button { editTarget = c } label: {
+                                        Label(loc.t("companion.edit"), systemImage: "pencil")
                                     }
                                     Button { publishTarget = c } label: {
                                         Label(loc.t("publish.menu"), systemImage: "square.and.arrow.up")
@@ -55,6 +59,11 @@ struct CompanionsView: View {
         .sheet(isPresented: $showCreate) {
             CreateCompanionView { c in companions.append(c) }
                 .environmentObject(loc)
+        }
+        .sheet(item: $editTarget) { c in
+            CreateCompanionView(editing: c) { updated in
+                if let i = companions.firstIndex(where: { $0.id == updated.id }) { companions[i] = updated }
+            }.environmentObject(loc)
         }
         .sheet(item: $publishTarget) { c in
             PublishView(companion: c).environmentObject(loc)
@@ -107,7 +116,7 @@ struct CompanionRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Avatar(initials: companion.avatar, tint: companion.tintColor, size: 46, seed: seed)
+            Avatar(initials: companion.avatar, tint: companion.tintColor, size: 46, seed: seed, imageURL: companion.avatar_url)
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Text(companion.name)

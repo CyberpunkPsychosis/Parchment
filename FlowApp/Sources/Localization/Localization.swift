@@ -275,6 +275,8 @@ final class Localization: ObservableObject {
         "companion.greeting":  [.zh: "开场白（可选）", .en: "Greeting (optional)"],
         "companion.tint":      [.zh: "配色", .en: "Color"],
         "companion.save":      [.zh: "创建", .en: "Create"],
+        "companion.edit":      [.zh: "编辑搭子", .en: "Edit companion"],
+        "companion.update":    [.zh: "保存", .en: "Save"],
         // 记忆
         "msg.remember":        [.zh: "记住这个", .en: "Remember this"],
         "msg.remembered":      [.zh: "已记住", .en: "Remembered"],

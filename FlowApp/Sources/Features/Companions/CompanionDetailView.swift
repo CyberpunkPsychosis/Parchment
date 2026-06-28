@@ -51,7 +51,7 @@ struct CompanionDetailView: View {
 
     private var growthHeader: some View {
         VStack(spacing: 10) {
-            Avatar(initials: companion.avatar, tint: companion.tintColor, size: 76, seed: 9)
+            Avatar(initials: companion.avatar, tint: companion.tintColor, size: 76, seed: 9, imageURL: companion.avatar_url)
             HStack(spacing: 6) {
                 Text(companion.name).font(FlowTheme.heading(20)).foregroundStyle(FlowTheme.ink)
                 LevelBadge(level: companion.level, stage: companion.stage, tint: companion.tintColor)

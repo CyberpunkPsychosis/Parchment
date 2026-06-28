@@ -208,10 +208,26 @@ final class APIClient {
     }
 
     func createCompanion(name: String, persona: String, avatar: String,
-                         tint: String, greeting: String) async throws -> Companion {
+                         tint: String, greeting: String, avatarURL: String? = nil) async throws -> Companion {
+        struct Body: Encodable {
+            let name: String; let persona: String; let avatar: String
+            let avatar_url: String?; let tint: String; let greeting: String
+        }
         let req = try makeRequest("/companions", method: "POST",
-                                  body: ["name": name, "persona": persona, "avatar": avatar,
-                                         "tint": tint, "greeting": greeting])
+                                  body: Body(name: name, persona: persona, avatar: avatar,
+                                             avatar_url: avatarURL, tint: tint, greeting: greeting))
+        return try await send(req, as: Companion.self)
+    }
+
+    func updateCompanion(id: Int, name: String, persona: String, avatar: String,
+                         tint: String, greeting: String, avatarURL: String?) async throws -> Companion {
+        struct Body: Encodable {
+            let name: String; let persona: String; let avatar: String
+            let avatar_url: String?; let tint: String; let greeting: String
+        }
+        let req = try makeRequest("/companions/\(id)", method: "PATCH",
+                                  body: Body(name: name, persona: persona, avatar: avatar,
+                                             avatar_url: avatarURL ?? "", tint: tint, greeting: greeting))
         return try await send(req, as: Companion.self)
     }
 

@@ -6,6 +6,7 @@ struct Companion: Codable, Identifiable, Hashable {
     let name: String
     let persona: String
     let avatar: String
+    var avatar_url: String? = nil
     let tint: String
     let greeting: String
     var visibility: String = "private"
@@ -36,7 +37,7 @@ struct Companion: Codable, Identifiable, Hashable {
     /// 给 ChatDetailView 复用的会话头信息。
     var asChat: ChatSummary {
         ChatSummary(name: name, initials: avatar, tint: tintColor,
-                    preview: "", time: "", unread: 0, isGroup: false)
+                    preview: "", time: "", unread: 0, isGroup: false, imageURL: avatar_url)
     }
 }
 

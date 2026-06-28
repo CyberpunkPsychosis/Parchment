@@ -239,7 +239,7 @@ struct ChatDetailView: View {
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(FlowTheme.ink)
             }
-            Avatar(initials: chat.initials, tint: chat.tint, size: 38)
+            Avatar(initials: chat.initials, tint: chat.tint, size: 38, imageURL: chat.imageURL)
             VStack(alignment: .leading, spacing: 2) {
                 Text(chat.name).font(.system(size: 16, weight: .semibold)).foregroundStyle(FlowTheme.ink)
                 HStack(spacing: 5) {

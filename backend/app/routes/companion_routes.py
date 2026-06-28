@@ -60,6 +60,7 @@ class CompanionIn(BaseModel):
     name: str = Field(min_length=1, max_length=20)
     persona: str = Field(min_length=1, max_length=600)
     avatar: str = Field(default="AI", max_length=2)
+    avatar_url: str | None = None
     tint: str = Field(default="teal")
     greeting: str = Field(default="", max_length=120)
 
@@ -67,8 +68,39 @@ class CompanionIn(BaseModel):
 @router.post("/companions")
 def create_companion(body: CompanionIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     c = Companion(owner_id=user.id, name=body.name, persona=body.persona,
-                  avatar=body.avatar or body.name[:1], tint=body.tint, greeting=body.greeting)
+                  avatar=body.avatar or body.name[:1], avatar_url=body.avatar_url,
+                  tint=body.tint, greeting=body.greeting)
     db.add(c)
+    db.commit()
+    db.refresh(c)
+    return c.public_dict()
+
+
+class CompanionPatch(BaseModel):
+    name: str | None = Field(default=None, max_length=20)
+    persona: str | None = Field(default=None, max_length=600)
+    avatar: str | None = Field(default=None, max_length=2)
+    avatar_url: str | None = None       # 传空字符串可清除
+    tint: str | None = None
+    greeting: str | None = Field(default=None, max_length=120)
+
+
+@router.patch("/companions/{cid}")
+def update_companion(cid: int, body: CompanionPatch,
+                     user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    c = _owned(db, user, cid)
+    if body.name is not None and body.name.strip():
+        c.name = body.name.strip()
+    if body.persona is not None and body.persona.strip():
+        c.persona = body.persona.strip()
+    if body.avatar is not None and body.avatar.strip():
+        c.avatar = body.avatar.strip()
+    if body.avatar_url is not None:
+        c.avatar_url = body.avatar_url or None
+    if body.tint is not None and body.tint.strip():
+        c.tint = body.tint.strip()
+    if body.greeting is not None:
+        c.greeting = body.greeting
     db.commit()
     db.refresh(c)
     return c.public_dict()

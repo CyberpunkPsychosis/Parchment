@@ -38,7 +38,8 @@ def _migrate():
                     conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {decl}"))
 
         # 体验完善新增列（表存在时才补；新表由 create_all 建）
-        _ensure("companions", {"exp": "INTEGER", "exp_day": "VARCHAR", "exp_today": "INTEGER"})
+        _ensure("companions", {"exp": "INTEGER", "exp_day": "VARCHAR", "exp_today": "INTEGER",
+                               "avatar_url": "VARCHAR"})
         _ensure("messages", {"reply_to_id": "INTEGER"})
         _ensure("users", {"avatar_url": "VARCHAR", "bio": "VARCHAR"})
         _ensure("conversations", {"avatar": "VARCHAR", "member_cap": "INTEGER", "announcement": "VARCHAR"})
