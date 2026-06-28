@@ -368,9 +368,11 @@ final class APIClient {
     }
 
     @discardableResult
-    func sendMessage(conversationId: Int, kind: String = "text", content: String) async throws -> MessageDTO {
+    func sendMessage(conversationId: Int, kind: String = "text", content: String,
+                     replyToId: Int? = nil) async throws -> MessageDTO {
+        struct Body: Encodable { let kind: String; let content: String; let reply_to_id: Int? }
         let req = try makeRequest("/conversations/\(conversationId)/messages", method: "POST",
-                                  body: ["kind": kind, "content": content])
+                                  body: Body(kind: kind, content: content, reply_to_id: replyToId))
         return try await send(req, as: MessageDTO.self)
     }
 
@@ -432,6 +434,24 @@ final class APIClient {
         var body = Data()
         body.append("--\(boundary)\r\n".data(using: .utf8)!)
         body.append("Content-Disposition: form-data; name=\"file\"; filename=\"img.\(ext)\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: \(mime)\r\n\r\n".data(using: .utf8)!)
+        body.append(data)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        req.httpBody = body
+        return try await send(req, as: R.self).url
+    }
+
+    /// 语音音频上传（m4a）。返回稳定 URL。
+    func uploadAudio(_ data: Data, ext: String = "m4a", mime: String = "audio/m4a") async throws -> String {
+        struct R: Decodable { let url: String }
+        guard let url = URL(string: AppConfig.baseURL.absoluteString + "/upload/audio") else { throw APIError.network("无效 URL") }
+        let boundary = "Boundary-\(UUID().uuidString)"
+        var req = URLRequest(url: url); req.httpMethod = "POST"
+        if let token { req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+        req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"voice.\(ext)\"\r\n".data(using: .utf8)!)
         body.append("Content-Type: \(mime)\r\n\r\n".data(using: .utf8)!)
         body.append(data)
         body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)

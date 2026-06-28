@@ -12,6 +12,21 @@ router = APIRouter(tags=["media"])
 _ALLOWED = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif"}
 _MAX = 8 * 1024 * 1024  # 8MB
 
+# 语音消息音频
+_AUDIO = {"audio/m4a": "m4a", "audio/mp4": "m4a", "audio/x-m4a": "m4a",
+          "audio/aac": "aac", "audio/mpeg": "mp3", "audio/wav": "wav",
+          "audio/x-wav": "wav", "audio/webm": "webm"}
+_MAX_AUDIO = 16 * 1024 * 1024  # 16MB
+
+
+def _save(data: bytes, ext: str) -> str:
+    target = os.path.join(STORAGE_DIR, "uploads")
+    os.makedirs(target, exist_ok=True)
+    name = f"{uuid.uuid4().hex}.{ext}"
+    with open(os.path.join(target, name), "wb") as f:
+        f.write(data)
+    return f"{PUBLIC_BASE_URL}/media/uploads/{name}"
+
 
 @router.post("/upload/image")
 async def upload_image(file: UploadFile = File(...), user: User = Depends(get_current_user)):
@@ -21,9 +36,14 @@ async def upload_image(file: UploadFile = File(...), user: User = Depends(get_cu
     data = await file.read()
     if len(data) > _MAX:
         raise HTTPException(status_code=413, detail="图片过大（>8MB）")
-    target = os.path.join(STORAGE_DIR, "uploads")
-    os.makedirs(target, exist_ok=True)
-    name = f"{uuid.uuid4().hex}.{ext}"
-    with open(os.path.join(target, name), "wb") as f:
-        f.write(data)
-    return {"url": f"{PUBLIC_BASE_URL}/media/uploads/{name}"}
+    return {"url": _save(data, ext)}
+
+
+@router.post("/upload/audio")
+async def upload_audio(file: UploadFile = File(...), user: User = Depends(get_current_user)):
+    """语音消息音频上传。返回稳定 URL；前端再带上时长拼成 content。"""
+    ext = _AUDIO.get((file.content_type or "").lower(), "m4a")
+    data = await file.read()
+    if len(data) > _MAX_AUDIO:
+        raise HTTPException(status_code=413, detail="音频过大（>16MB）")
+    return {"url": _save(data, ext)}

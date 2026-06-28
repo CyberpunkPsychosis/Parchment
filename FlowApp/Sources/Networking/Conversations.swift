@@ -48,6 +48,7 @@ struct MessageDTO: Codable, Identifiable, Hashable {
     let sender_tint: String
     let is_ai: Bool
     var reactions: [MsgReaction]? = nil
+    var reply_to: ReplySummary? = nil
     // —— 搭子成长（仅 ai-reply 响应带）——
     var companion_growth: CompanionGrowth? = nil
     var leveled_up: Bool? = nil
@@ -58,6 +59,12 @@ struct MessageDTO: Codable, Identifiable, Hashable {
         if let t = created_at.split(separator: "T").last { return String(t.prefix(5)) }
         return ""
     }
+}
+
+struct ReplySummary: Codable, Hashable {
+    let id: Int
+    let sender_name: String
+    let snippet: String
 }
 
 struct CompanionGrowth: Codable, Hashable {

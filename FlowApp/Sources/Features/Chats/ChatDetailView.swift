@@ -522,13 +522,117 @@ struct ChatDetailView: View {
 }
 
 /// Gray-blue hand-drawn thread background (the dark sketch lightened).
+/// 可自定义的聊天背景：内置预设 + 自定义上传图（存 AppStorage，全局生效）。
 struct ChatBackground: View {
+    @AppStorage("flow.chatBg") private var preset = "default"
+    @AppStorage("flow.chatBgURL") private var customURL = ""
+
     var body: some View {
         ZStack {
-            FlowTheme.chatBg
-            Image("paper_dark").resizable().scaledToFill().opacity(0.5)
+            switch preset {
+            case "paper":
+                FlowTheme.parchment
+                Image("paper_light").resizable().scaledToFill().opacity(0.6)
+            case "sage":
+                FlowTheme.sage.opacity(0.35)
+            case "beige":
+                FlowTheme.beige
+            case "plain":
+                Color(hex: 0xF7F4EC)
+            case "custom":
+                if let u = URL(string: customURL), !customURL.isEmpty {
+                    AsyncImage(url: u) { img in img.resizable().scaledToFill() } placeholder: { FlowTheme.chatBg }
+                } else {
+                    FlowTheme.chatBg
+                }
+            default:
+                FlowTheme.chatBg
+                Image("paper_dark").resizable().scaledToFill().opacity(0.5)
+            }
         }
         .clipped()
+    }
+}
+
+/// 聊天背景选择器：预设 + 自定义上传。
+struct ChatBackgroundPicker: View {
+    @EnvironmentObject var loc: Localization
+    @Environment(\.dismiss) private var dismiss
+    @AppStorage("flow.chatBg") private var preset = "default"
+    @AppStorage("flow.chatBgURL") private var customURL = ""
+    @State private var photoItem: PhotosPickerItem?
+    @State private var uploading = false
+
+    private let presets: [(id: String, key: String)] = [
+        ("default", "bg.default"), ("paper", "bg.paper"), ("sage", "bg.sage"),
+        ("beige", "bg.beige"), ("plain", "bg.plain"),
+    ]
+
+    var body: some View {
+        ZStack {
+            PaperBackground()
+            VStack(spacing: 18) {
+                Text(loc.t("bg.title")).font(FlowTheme.heading(20)).foregroundStyle(FlowTheme.ink).padding(.top, 20)
+                ScrollView {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 12)], spacing: 12) {
+                        ForEach(presets, id: \.id) { p in
+                            Button { preset = p.id } label: { swatch(p.id, label: loc.t(p.key)) }.buttonStyle(.plain)
+                        }
+                        PhotosPicker(selection: $photoItem, matching: .images) {
+                            VStack(spacing: 6) {
+                                Image(systemName: uploading ? "arrow.up.circle" : "plus.circle")
+                                    .font(.system(size: 24)).foregroundStyle(FlowTheme.teal)
+                                Text(loc.t("bg.custom")).font(FlowTheme.caption(11)).foregroundStyle(FlowTheme.ink)
+                            }
+                            .frame(maxWidth: .infinity).frame(height: 88)
+                            .background(RoundedRectangle(cornerRadius: 14).fill(FlowTheme.card))
+                            .sketchBorder(14, width: 1.3, seed: 71)
+                        }
+                    }.padding(16)
+                }
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            Button { dismiss() } label: {
+                Image(systemName: "xmark.circle.fill").font(.system(size: 26)).foregroundStyle(FlowTheme.gray.opacity(0.6))
+            }.padding(16)
+        }
+        .onChange(of: photoItem) { _, item in
+            guard let item else { return }
+            uploading = true
+            Task {
+                if let data = try? await item.loadTransferable(type: Data.self),
+                   let url = try? await APIClient.shared.uploadImage(data) {
+                    await MainActor.run { customURL = url; preset = "custom" }
+                }
+                await MainActor.run { uploading = false; photoItem = nil }
+            }
+        }
+    }
+
+    private func swatch(_ id: String, label: String) -> some View {
+        ZStack {
+            previewBg(id).frame(height: 88).clipShape(RoundedRectangle(cornerRadius: 14))
+            if preset == id {
+                RoundedRectangle(cornerRadius: 14).strokeBorder(FlowTheme.teal, lineWidth: 2.5)
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(FlowTheme.teal).font(.system(size: 20))
+            }
+            Text(label).font(FlowTheme.caption(11)).foregroundStyle(FlowTheme.ink)
+                .padding(.horizontal, 6).padding(.vertical, 2)
+                .background(Capsule().fill(.white.opacity(0.7)))
+                .frame(maxHeight: .infinity, alignment: .bottom).padding(.bottom, 6)
+        }
+        .sketchBorder(14, width: 1.3, seed: UInt64(id.hashValue & 0xffff))
+    }
+
+    @ViewBuilder private func previewBg(_ id: String) -> some View {
+        switch id {
+        case "paper": ZStack { FlowTheme.parchment; Image("paper_light").resizable().scaledToFill().opacity(0.6) }
+        case "sage": FlowTheme.sage.opacity(0.35)
+        case "beige": FlowTheme.beige
+        case "plain": Color(hex: 0xF7F4EC)
+        default: ZStack { FlowTheme.chatBg; Image("paper_dark").resizable().scaledToFill().opacity(0.5) }
+        }
     }
 }
 

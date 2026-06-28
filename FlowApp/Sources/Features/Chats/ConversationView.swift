@@ -27,6 +27,10 @@ struct ConversationView: View {
     @State private var mentionQuery: String?
     @State private var levelUpToast: String?
     @State private var headerGrowth: CompanionGrowth?
+    @State private var replyingTo: MessageDTO?
+    @State private var forwardingMsg: MessageDTO?
+    @StateObject private var recorder = AudioRecorder()
+    @State private var showBgPicker = false
 
     private var myId: Int? { auth.user?.id }
     private var aiMembers: [ConvMemberDTO] { members.filter { $0.is_ai } }
@@ -54,7 +58,9 @@ struct ConversationView: View {
                             ConvBubble(msg: m, myId: myId, isGroup: conversation.is_group,
                                        onAvatarTap: { uid in profileRef = UserRef(id: uid) },
                                        onRecall: { recall(m) },
-                                       onReact: { e in react(m, e) }).id(m.id)
+                                       onReact: { e in react(m, e) },
+                                       onReply: { replyingTo = m },
+                                       onForward: { forwardingMsg = m }).id(m.id)
                         }
                         if let typingName { Text("\(typingName) \(loc.t("chat.typing"))").font(FlowTheme.caption(11)).foregroundStyle(FlowTheme.gray).frame(maxWidth: .infinity, alignment: .leading) }
                         if aiBusy { HStack { ProgressView().tint(FlowTheme.teal); Spacer() }.padding(.leading, 8) }
@@ -119,6 +125,11 @@ struct ConversationView: View {
             GroupMembersView(conversation: conversation, myId: myId, onLeave: { dismiss() })
         }
         .sheet(item: $profileRef) { ref in UserProfileView(userId: ref.id) }
+        .sheet(item: $forwardingMsg) { m in
+            ForwardPickerView(excludeId: conversation.id) { convId in forward(m, to: convId) }
+                .environmentObject(loc)
+        }
+        .sheet(isPresented: $showBgPicker) { ChatBackgroundPicker().environmentObject(loc) }
         .onChange(of: photoItem) { _, item in
             guard let item else { return }
             Task {
@@ -163,9 +174,10 @@ struct ConversationView: View {
     private func send() {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !sending else { return }
-        draft = ""; sending = true; suggestions = []; mentionQuery = nil
+        let replyId = replyingTo?.id
+        draft = ""; sending = true; suggestions = []; mentionQuery = nil; replyingTo = nil
         Task {
-            let m = try? await APIClient.shared.sendMessage(conversationId: conversation.id, content: text)
+            let m = try? await APIClient.shared.sendMessage(conversationId: conversation.id, content: text, replyToId: replyId)
             await MainActor.run { if let m { appendUnique(m) }; sending = false }
             // 私聊里如果有 AI 搭子，自动让它接话
             if conversation.type == "companion" || (!conversation.is_group && aiMembers.count == 1),
@@ -196,6 +208,28 @@ struct ConversationView: View {
             draft += "@\(name) "
         }
         mentionQuery = nil
+    }
+
+    /// 松开麦克风：停止录音→上传→发送语音消息。
+    private func finishRecording() {
+        guard let (url, secs) = recorder.stop() else { return }
+        Task {
+            guard let data = try? Data(contentsOf: url) else { return }
+            if let remote = try? await APIClient.shared.uploadAudio(data),
+               let m = try? await APIClient.shared.sendMessage(
+                    conversationId: conversation.id, kind: "voice", content: "\(remote)|\(secs)") {
+                await MainActor.run { appendUnique(m) }
+            }
+            try? FileManager.default.removeItem(at: url)
+        }
+    }
+
+    /// 转发：把原消息内容发到所选会话。
+    private func forward(_ m: MessageDTO, to convId: Int) {
+        Task {
+            _ = try? await APIClient.shared.sendMessage(conversationId: convId, kind: m.kind, content: m.content)
+            await MainActor.run { forwardingMsg = nil }
+        }
     }
 
     private func summon(_ companionId: Int) async {
@@ -298,6 +332,7 @@ struct ConversationView: View {
             Menu {
                 Button { showAddAI = true } label: { Label(loc.t("conv.addAI"), systemImage: "sparkles") }
                 Button { showShareCompanion = true } label: { Label(loc.t("conv.shareCompanion"), systemImage: "person.crop.rectangle") }
+                Button { showBgPicker = true } label: { Label(loc.t("bg.title"), systemImage: "photo.on.rectangle") }
                 Button { runSuggest() } label: { Label(loc.t("conv.smartReply"), systemImage: "wand.and.stars") }
                 if conversation.is_group {
                     Button { runSummarize() } label: { Label(loc.t("conv.summarize"), systemImage: "list.bullet.rectangle") }
@@ -354,21 +389,101 @@ struct ConversationView: View {
     }
 
     private var inputBar: some View {
-        HStack(spacing: 10) {
-            PhotosPicker(selection: $photoItem, matching: .images) {
-                Image(systemName: "photo").font(.system(size: 20)).foregroundStyle(FlowTheme.gray)
-            }
-            HStack {
-                TextField(loc.t("chat.placeholder"), text: $draft).font(FlowTheme.body(15)).onSubmit { send() }
-            }
-            .padding(.horizontal, 16).padding(.vertical, 11)
-            .background(RoundedRectangle(cornerRadius: 22).fill(Color.white.opacity(0.9)))
-            .sketchBorder(22, width: 1.4, seed: 42)
+        VStack(spacing: 0) {
+            if let r = replyingTo { replyingBanner(r) }
+            if recorder.isRecording { recordingBanner }
+            HStack(spacing: 10) {
+                PhotosPicker(selection: $photoItem, matching: .images) {
+                    Image(systemName: "photo").font(.system(size: 20)).foregroundStyle(FlowTheme.gray)
+                }
+                // 长按麦克风录音，松手发送
+                Image(systemName: recorder.isRecording ? "mic.fill" : "mic")
+                    .font(.system(size: 20)).foregroundStyle(recorder.isRecording ? FlowTheme.teal : FlowTheme.gray)
+                    .scaleEffect(recorder.isRecording ? 1.2 : 1)
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { _ in if !recorder.isRecording { recorder.start() } }
+                            .onEnded { _ in finishRecording() }
+                    )
+                HStack {
+                    TextField(loc.t("chat.placeholder"), text: $draft).font(FlowTheme.body(15)).onSubmit { send() }
+                }
+                .padding(.horizontal, 16).padding(.vertical, 11)
+                .background(RoundedRectangle(cornerRadius: 22).fill(Color.white.opacity(0.9)))
+                .sketchBorder(22, width: 1.4, seed: 42)
 
-            Button { send() } label: { PillButton(title: loc.t("chat.send"), radius: 22, seed: 41) }
+                Button { send() } label: { PillButton(title: loc.t("chat.send"), radius: 22, seed: 41) }
+            }
+            .padding(.horizontal, 14).padding(.vertical, 10)
         }
-        .padding(.horizontal, 14).padding(.vertical, 10)
         .background(FlowTheme.card.overlay(Rectangle().fill(FlowTheme.stroke).frame(height: 1), alignment: .top))
+    }
+
+    private func replyingBanner(_ r: MessageDTO) -> some View {
+        HStack(spacing: 8) {
+            Rectangle().fill(FlowTheme.teal).frame(width: 2.5, height: 28)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("\(loc.t("chat.replyingTo"))\(r.sender_name)").font(.system(size: 11, weight: .semibold)).foregroundStyle(FlowTheme.teal)
+                Text(r.kind == "text" ? r.content : (r.kind == "voice" ? "[语音]" : "[图片]"))
+                    .font(.system(size: 11)).foregroundStyle(FlowTheme.gray).lineLimit(1)
+            }
+            Spacer()
+            Button { replyingTo = nil } label: {
+                Image(systemName: "xmark.circle.fill").font(.system(size: 18)).foregroundStyle(FlowTheme.gray.opacity(0.6))
+            }
+        }
+        .padding(.horizontal, 16).padding(.vertical, 8)
+        .background(FlowTheme.parchment)
+    }
+
+    private var recordingBanner: some View {
+        HStack(spacing: 8) {
+            Circle().fill(.red).frame(width: 8, height: 8)
+            Text("\(loc.t("chat.recording")) \(Int(recorder.elapsed))s").font(FlowTheme.caption(12)).foregroundStyle(FlowTheme.ink)
+            Spacer()
+            Text(loc.t("chat.releaseToSend")).font(FlowTheme.caption(11)).foregroundStyle(FlowTheme.gray)
+        }
+        .padding(.horizontal, 16).padding(.vertical, 8)
+        .background(FlowTheme.parchment)
+    }
+}
+
+/// 转发目标选择器：选一个会话把消息转过去。
+struct ForwardPickerView: View {
+    @EnvironmentObject var loc: Localization
+    @Environment(\.dismiss) private var dismiss
+    let excludeId: Int
+    var onPick: (Int) -> Void
+    @State private var conversations: [ConversationDTO] = []
+
+    var body: some View {
+        ZStack {
+            PaperBackground()
+            VStack(spacing: 0) {
+                Text(loc.t("chat.forwardTo")).font(FlowTheme.heading(18)).foregroundStyle(FlowTheme.ink).padding(.vertical, 16)
+                ScrollView {
+                    LazyVStack(spacing: 10) {
+                        ForEach(conversations.filter { $0.id != excludeId }) { c in
+                            Button { onPick(c.id); dismiss() } label: {
+                                HStack(spacing: 12) {
+                                    Avatar(initials: c.avatar, tint: c.tintColor, size: 40, imageURL: c.avatar_url)
+                                    Text(c.title).font(FlowTheme.body(15)).foregroundStyle(FlowTheme.ink)
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 14).padding(.vertical, 10)
+                                .sketchCard(14, fill: FlowTheme.card, seed: UInt64(c.id + 20))
+                            }.buttonStyle(.plain)
+                        }
+                    }.padding(16)
+                }
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            Button { dismiss() } label: {
+                Image(systemName: "xmark.circle.fill").font(.system(size: 26)).foregroundStyle(FlowTheme.gray.opacity(0.6))
+            }.padding(16)
+        }
+        .task { conversations = (try? await APIClient.shared.listConversations()) ?? [] }
     }
 }
 
@@ -442,6 +557,8 @@ struct ConvBubble: View {
     var onAvatarTap: ((Int) -> Void)? = nil
     var onRecall: () -> Void = {}
     var onReact: (String) -> Void = {}
+    var onReply: () -> Void = {}
+    var onForward: () -> Void = {}
 
     private let quickEmojis = ["👍", "❤️", "😂", "😮", "😢", "🙏"]
     private var mine: Bool { msg.sender_user_id != nil && msg.sender_user_id == myId }
@@ -459,8 +576,14 @@ struct ConvBubble: View {
                 if (isGroup || msg.is_ai) && !mine {
                     Text(msg.sender_name).font(FlowTheme.caption(11)).foregroundStyle(FlowTheme.gray)
                 }
-                bubble.contextMenu {
+                VStack(alignment: mine ? .trailing : .leading, spacing: 2) {
+                    if let rs = msg.reply_to { replyQuote(rs) }
+                    bubble
+                }
+                .contextMenu {
                     if msg.kind == "text" { Button { UIPasteboard.general.string = msg.content } label: { Label("复制 Copy", systemImage: "doc.on.doc") } }
+                    Button { onReply() } label: { Label("引用 Reply", systemImage: "arrowshape.turn.up.left") }
+                    if msg.kind == "text" || msg.kind == "image" { Button { onForward() } label: { Label("转发 Forward", systemImage: "arrowshape.turn.up.right") } }
                     Menu { ForEach(quickEmojis, id: \.self) { e in Button(e) { onReact(e) } } } label: { Label("回应 React", systemImage: "face.smiling") }
                     if mine { Button(role: .destructive) { onRecall() } label: { Label("撤回 Recall", systemImage: "arrow.uturn.backward") } }
                 }
@@ -479,11 +602,27 @@ struct ConvBubble: View {
         }
     }
 
+    /// 引用的原消息摘要（气泡上方）。
+    private func replyQuote(_ rs: ReplySummary) -> some View {
+        HStack(spacing: 5) {
+            Rectangle().fill(FlowTheme.teal.opacity(0.6)).frame(width: 2.5)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(rs.sender_name).font(.system(size: 10, weight: .semibold)).foregroundStyle(FlowTheme.teal)
+                Text(rs.snippet).font(.system(size: 11)).foregroundStyle(FlowTheme.gray).lineLimit(1)
+            }
+        }
+        .padding(.horizontal, 8).padding(.vertical, 5)
+        .background(RoundedRectangle(cornerRadius: 8).fill(FlowTheme.ink.opacity(0.05)))
+        .frame(maxWidth: 220, alignment: .leading)
+    }
+
     @ViewBuilder private var bubble: some View {
         switch msg.kind {
         case "image", "sticker":
             AsyncImage(url: URL(string: msg.content)) { img in img.resizable().scaledToFill() } placeholder: { FlowTheme.beige }
             .frame(width: 140, height: 140).clipShape(RoundedRectangle(cornerRadius: 16)).sketchBorder(16, width: 1.4, seed: UInt64(msg.id))
+        case "voice":
+            VoiceMessageBubble(content: msg.content, mine: mine, seed: UInt64(msg.id))
         case "companion":
             CompanionCard(json: msg.content)
         case "system":

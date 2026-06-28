@@ -88,9 +88,36 @@ def _reactions(db: Session, mid: int) -> list[dict]:
     return [{"emoji": e, "count": n} for e, n in counts.items()]
 
 
+def _reply_summary(db: Session, reply_to_id: int | None) -> dict | None:
+    """被引用消息的精简摘要（发送者 + 一句内容）。"""
+    if not reply_to_id:
+        return None
+    r = db.query(Message).filter(Message.id == reply_to_id).first()
+    if not r:
+        return None
+    if r.sender_companion_id:
+        c = db.query(Companion).filter(Companion.id == r.sender_companion_id).first()
+        who = c.name if c else "AI"
+    else:
+        u = db.query(User).filter(User.id == r.sender_user_id).first() if r.sender_user_id else None
+        who = u.nickname if u else "用户"
+    if r.kind == "text":
+        snippet = r.content[:50]
+    elif r.kind in ("image", "sticker"):
+        snippet = "[图片]"
+    elif r.kind == "voice":
+        snippet = "[语音]"
+    elif r.kind == "companion":
+        snippet = "[搭子名片]"
+    else:
+        snippet = "[文件]"
+    return {"id": r.id, "sender_name": who, "snippet": snippet}
+
+
 def serialize_message(db: Session, m: Message) -> dict:
     """uid 无关的消息 DTO；客户端用 sender_user_id 判断是否自己发的。"""
     reactions = _reactions(db, m.id)
+    reply_to = _reply_summary(db, m.reply_to_id)
     if m.sender_companion_id:
         c = db.query(Companion).filter(Companion.id == m.sender_companion_id).first()
         name = c.name if c else "AI"
@@ -99,7 +126,8 @@ def serialize_message(db: Session, m: Message) -> dict:
                 "sender_user_id": None, "companion_id": m.sender_companion_id,
                 "sender_name": name, "sender_avatar": c.avatar if c else "AI",
                 "sender_avatar_url": None,
-                "sender_tint": c.tint if c else "teal", "is_ai": True, "reactions": reactions}
+                "sender_tint": c.tint if c else "teal", "is_ai": True,
+                "reactions": reactions, "reply_to": reply_to}
     u = db.query(User).filter(User.id == m.sender_user_id).first() if m.sender_user_id else None
     name = u.nickname if u else "用户"
     return {"id": m.id, "conversation_id": m.conversation_id, "kind": m.kind,
@@ -107,7 +135,8 @@ def serialize_message(db: Session, m: Message) -> dict:
             "sender_user_id": m.sender_user_id, "companion_id": None,
             "sender_name": name, "sender_avatar": _initials(name),
             "sender_avatar_url": u.avatar_url if u else None,
-            "sender_tint": _tint_for(m.sender_user_id or 0), "is_ai": False, "reactions": reactions}
+            "sender_tint": _tint_for(m.sender_user_id or 0), "is_ai": False,
+            "reactions": reactions, "reply_to": reply_to}
 
 
 def conv_dict(db: Session, conv: Conversation, uid: int) -> dict:
@@ -361,6 +390,7 @@ def list_messages(cid: int, after_id: int = 0, limit: int = 50,
 class NewMessage(BaseModel):
     kind: str = Field(default="text")
     content: str = Field(default="")
+    reply_to_id: int | None = None
 
 
 @router.post("/conversations/{cid}/messages")
@@ -369,8 +399,14 @@ async def post_message(cid: int, body: NewMessage,
     conv = db.query(Conversation).filter(Conversation.id == cid).first()
     if not conv or not is_member(db, cid, user.id):
         raise HTTPException(status_code=403, detail="无权访问")
+    # 引用必须指向同会话内的消息
+    reply_to = None
+    if body.reply_to_id:
+        r = db.query(Message).filter(Message.id == body.reply_to_id,
+                                     Message.conversation_id == cid).first()
+        reply_to = r.id if r else None
     m = Message(conversation_id=cid, sender_user_id=user.id,
-                kind=body.kind, content=body.content)
+                kind=body.kind, content=body.content, reply_to_id=reply_to)
     db.add(m); db.commit(); db.refresh(m)
     touch(db, conv)
     await broadcast_message(db, conv, m)

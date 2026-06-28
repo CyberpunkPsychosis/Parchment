@@ -299,7 +299,8 @@ class Message(Base):
     sender_user_id = Column(Integer, index=True, nullable=True)      # 人发的
     sender_companion_id = Column(Integer, index=True, nullable=True) # AI 搭子发的
     kind = Column(String, nullable=False, default="text")  # text|image|sticker|file|voice|system|companion
-    content = Column(String, nullable=False, default="")   # 文本 / URL / JSON
+    content = Column(String, nullable=False, default="")   # 文本 / URL / JSON / "url|duration"(voice)
+    reply_to_id = Column(Integer, nullable=True, index=True)  # 引用的消息
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
