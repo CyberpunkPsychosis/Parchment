@@ -7,6 +7,7 @@ struct SettingsView: View {
     @State private var showPaywall = false
     @State private var cacheText = "—"
     @State private var cacheCleared = false
+    @State private var showBlocklist = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -57,6 +58,18 @@ struct SettingsView: View {
                             .frame(width: 160)
                         }
                         .padding(18)
+                    }
+
+                    // 黑名单管理
+                    Card {
+                        Button { showBlocklist = true } label: {
+                            HStack {
+                                Text(loc.t("safety.blocklist")).font(FlowTheme.body(16)).foregroundStyle(FlowTheme.ink)
+                                Spacer()
+                                Image(systemName: "chevron.right").foregroundStyle(FlowTheme.gray)
+                            }
+                            .padding(18)
+                        }
                     }
 
                     // Account / membership
@@ -113,6 +126,9 @@ struct SettingsView: View {
         .background(PaperBackground())
         .sheet(isPresented: $showPaywall) {
             PaywallView().environmentObject(loc).environmentObject(auth)
+        }
+        .sheet(isPresented: $showBlocklist) {
+            BlockListView().environmentObject(loc)
         }
         .alert(loc.t("settings.cacheCleared"), isPresented: $cacheCleared) {
             Button("OK", role: .cancel) {}

@@ -437,3 +437,26 @@ class CompanionDiary(Base):
     def public_dict(self) -> dict:
         return {"id": self.id, "content": self.content,
                 "created_at": self.created_at.isoformat()}
+
+
+class Block(Base):
+    """拉黑：user_id 拉黑了 blocked_id。"""
+    __tablename__ = "blocks"
+    __table_args__ = (UniqueConstraint("user_id", "blocked_id", name="uq_block"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, index=True, nullable=False)
+    blocked_id = Column(Integer, index=True, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class Report(Base):
+    """举报：用户 / 消息 / 群 等。"""
+    __tablename__ = "reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    reporter_id = Column(Integer, index=True, nullable=False)
+    target_type = Column(String, nullable=False, default="user")  # user | message | group | post
+    target_id = Column(Integer, nullable=False)
+    reason = Column(String, nullable=False, default="")
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)

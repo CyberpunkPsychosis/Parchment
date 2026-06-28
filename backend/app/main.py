@@ -9,7 +9,8 @@ from .db import Base, engine, SessionLocal
 from . import models  # noqa: F401  注册模型后再建表
 from .routes import (auth_routes, chat_routes, membership, image_routes,
                      companion_routes, market_routes, group_routes, messaging_routes,
-                     friends_routes, moments_routes, media_routes, search_routes)
+                     friends_routes, moments_routes, media_routes, search_routes,
+                     block_routes)
 from .config import STORAGE_DIR
 from .seed import seed_demo_market, seed_demo_groups
 
@@ -81,6 +82,7 @@ app.include_router(friends_routes.router)
 app.include_router(moments_routes.router)
 app.include_router(media_routes.router)
 app.include_router(search_routes.router)
+app.include_router(block_routes.router)
 
 
 @app.get("/")

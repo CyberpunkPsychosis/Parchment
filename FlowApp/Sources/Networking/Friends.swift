@@ -16,6 +16,14 @@ struct FriendUser: Codable, Identifiable, Hashable {
     var tintColor: Color { FlowTheme.tint(tint) }
 }
 
+struct BlockedUser: Codable, Identifiable, Hashable {
+    let user_id: Int
+    let nickname: String
+    var avatar_url: String? = nil
+    var id: Int { user_id }
+    var initials: String { nickname.prefix(2).uppercased() }
+}
+
 struct IncomingRequest: Codable, Identifiable, Hashable {
     let id: Int
     let from_user_id: Int

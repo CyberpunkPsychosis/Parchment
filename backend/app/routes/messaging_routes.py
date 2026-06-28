@@ -326,6 +326,9 @@ def create_conversation(body: NewConversation,
             raise HTTPException(status_code=400, detail="缺少有效的对端用户")
         if not db.query(User).filter(User.id == body.peer_user_id).first():
             raise HTTPException(status_code=404, detail="用户不存在")
+        from .block_routes import is_blocked_between
+        if is_blocked_between(db, user.id, body.peer_user_id):
+            raise HTTPException(status_code=403, detail="对方在你的黑名单中或已将你拉黑")
         c = ensure_direct(db, user.id, body.peer_user_id)
         return conv_dict(db, c, user.id)
     if body.type == "group":
@@ -399,6 +402,12 @@ async def post_message(cid: int, body: NewMessage,
     conv = db.query(Conversation).filter(Conversation.id == cid).first()
     if not conv or not is_member(db, cid, user.id):
         raise HTTPException(status_code=403, detail="无权访问")
+    # 私聊里若与对端互相拉黑，禁止发送
+    if conv.type == "direct":
+        from .block_routes import is_blocked_between
+        peer = next((uid for uid in member_ids(db, cid) if uid != user.id), None)
+        if peer and is_blocked_between(db, user.id, peer):
+            raise HTTPException(status_code=403, detail="对方在你的黑名单中或已将你拉黑")
     # 引用必须指向同会话内的消息
     reply_to = None
     if body.reply_to_id:

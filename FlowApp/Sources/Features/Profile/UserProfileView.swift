@@ -11,6 +11,9 @@ struct UserProfileView: View {
     @State private var user: FriendUser?
     @State private var route: ConversationDTO?
     @State private var requested = false
+    @State private var showReport = false
+    @State private var reportReason = ""
+    @State private var toast: String?
 
     var body: some View {
         NavigationStack {
@@ -70,8 +73,49 @@ struct UserProfileView: View {
             .overlay(alignment: .topTrailing) {
                 Button { dismiss() } label: { Image(systemName: "xmark").foregroundStyle(FlowTheme.gray) }.padding(16)
             }
+            .overlay(alignment: .topLeading) {
+                if let u = user, !u.is_me {
+                    Menu {
+                        Button(role: .destructive) { block(u) } label: { Label(loc.t("safety.block"), systemImage: "hand.raised") }
+                        Button { showReport = true } label: { Label(loc.t("safety.report"), systemImage: "exclamationmark.bubble") }
+                    } label: {
+                        Image(systemName: "ellipsis").font(.system(size: 18, weight: .semibold)).foregroundStyle(FlowTheme.gray)
+                    }.padding(16)
+                }
+            }
+            .overlay(alignment: .bottom) {
+                if let toast {
+                    Text(toast).font(FlowTheme.caption(13)).foregroundStyle(.white)
+                        .padding(.horizontal, 16).padding(.vertical, 10)
+                        .background(Capsule().fill(FlowTheme.ink.opacity(0.85))).padding(.bottom, 30)
+                }
+            }
+            .alert(loc.t("safety.report"), isPresented: $showReport) {
+                TextField(loc.t("safety.reportReason"), text: $reportReason)
+                Button(loc.t("safety.submit")) { submitReport() }
+                Button(loc.t("common.cancel"), role: .cancel) { reportReason = "" }
+            }
         }
         .task { user = try? await APIClient.shared.userProfile(userId) }
+    }
+
+    private func block(_ u: FriendUser) {
+        Task {
+            try? await APIClient.shared.blockUser(u.id)
+            await MainActor.run { toast = loc.t("safety.blocked") }
+            try? await Task.sleep(nanoseconds: 900_000_000)
+            await MainActor.run { dismiss() }
+        }
+    }
+
+    private func submitReport() {
+        let reason = reportReason; reportReason = ""
+        Task {
+            try? await APIClient.shared.report(targetType: "user", targetId: userId, reason: reason)
+            await MainActor.run { toast = loc.t("safety.reported") }
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            await MainActor.run { if toast == loc.t("safety.reported") { toast = nil } }
+        }
     }
 
     private func dm(_ u: FriendUser) {

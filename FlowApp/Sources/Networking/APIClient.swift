@@ -508,6 +508,31 @@ final class APIClient {
         _ = try await URLSession.shared.data(for: req)
     }
 
+    // MARK: 拉黑 / 举报
+
+    func blockUser(_ uid: Int) async throws {
+        let req = try makeRequest("/blocks", method: "POST", body: ["user_id": uid])
+        _ = try await URLSession.shared.data(for: req)
+    }
+
+    func unblockUser(_ uid: Int) async throws {
+        let req = try makeRequest("/blocks/\(uid)", method: "DELETE")
+        _ = try await URLSession.shared.data(for: req)
+    }
+
+    func listBlocks() async throws -> [BlockedUser] {
+        struct R: Decodable { let blocks: [BlockedUser] }
+        let req = try makeRequest("/blocks", method: "GET")
+        return try await send(req, as: R.self).blocks
+    }
+
+    func report(targetType: String, targetId: Int, reason: String) async throws {
+        struct Body: Encodable { let target_type: String; let target_id: Int; let reason: String }
+        let req = try makeRequest("/reports", method: "POST",
+                                  body: Body(target_type: targetType, target_id: targetId, reason: reason))
+        _ = try await URLSession.shared.data(for: req)
+    }
+
     func listFriendRequests() async throws -> [IncomingRequest] {
         struct R: Decodable { let requests: [IncomingRequest] }
         let req = try makeRequest("/friends/requests", method: "GET")

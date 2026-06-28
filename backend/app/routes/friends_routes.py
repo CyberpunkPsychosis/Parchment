@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from ..deps import get_current_user
 from ..db import get_db
 from ..models import User, Friendship, FriendRequest, Companion
+from .block_routes import is_blocked_between
 
 router = APIRouter(tags=["friends"])
 
@@ -52,7 +53,8 @@ def search_users(q: str, user: User = Depends(get_current_user), db: Session = D
         return {"users": []}
     rows = (db.query(User)
             .filter(or_(User.nickname.ilike(f"%{q}%"), User.email.ilike(f"%{q}%")))
-            .filter(User.id != user.id).limit(20).all())
+            .filter(User.id != user.id).limit(40).all())
+    rows = [u for u in rows if not is_blocked_between(db, user.id, u.id)][:20]
     return {"users": [_user_dict(db, u, user.id) for u in rows]}
 
 
