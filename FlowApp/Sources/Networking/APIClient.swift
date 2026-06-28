@@ -592,6 +592,11 @@ final class APIClient {
         return try await send(req, as: MomentComment.self)
     }
 
+    func postDetail(postId: Int) async throws -> PostDetailDTO {
+        let req = try makeRequest("/moments/\(postId)", method: "GET")
+        return try await send(req, as: PostDetailDTO.self)
+    }
+
     func registerDevice(token: String) async throws {
         let req = try makeRequest("/devices", method: "POST", body: ["token": token, "platform": "ios"])
         _ = try await URLSession.shared.data(for: req)

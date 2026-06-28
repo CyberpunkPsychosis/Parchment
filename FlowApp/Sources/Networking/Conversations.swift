@@ -101,6 +101,7 @@ extension Notification.Name {
     static let flowRecall = Notification.Name("flow.recall")
     static let flowReaction = Notification.Name("flow.reaction")
     static let flowTyping = Notification.Name("flow.typing")
+    static let flowMomentsChanged = Notification.Name("flow.moments.changed")
 }
 
 struct SocketEnvelope: Decodable {

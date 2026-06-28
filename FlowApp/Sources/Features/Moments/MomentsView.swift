@@ -7,7 +7,9 @@ struct MomentsView: View {
     @State private var posts: [MomentPost] = []
     @State private var loaded = false
     @State private var showCompose = false
-    @State private var commentsFor: MomentPost?
+    @State private var expanded: Set<Int> = []
+    @State private var commentCache: [Int: [MomentComment]] = [:]
+    @State private var drafts: [Int: String] = [:]
 
     var body: some View {
         ScrollView {
@@ -36,28 +38,38 @@ struct MomentsView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task { await reload() }
         .sheet(isPresented: $showCompose) { ComposeMomentView { Task { await reload() } } }
-        .sheet(item: $commentsFor) { p in CommentsSheet(post: p) { Task { await reload() } } }
+        .onReceive(NotificationCenter.default.publisher(for: .flowMomentsChanged)) { _ in
+            Task { await reload() }
+        }
     }
 
     private func postCard(_ p: MomentPost, seed: UInt64) -> some View {
         Card(seed: seed) {
             VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 11) {
-                    Avatar(initials: p.author_initials, tint: FlowTheme.tint(["teal","sage","tealDark","ink","gray"][p.author_id % 5]), size: 40, seed: seed, imageURL: p.author_avatar_url)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(p.author_name).font(.system(size: 15, weight: .semibold)).foregroundStyle(FlowTheme.ink)
-                        Text(p.shortTime).font(FlowTheme.caption(11)).foregroundStyle(FlowTheme.gray)
+                // 头部 + 正文 + 配图：点进详情页（微信式）
+                NavigationLink(value: p) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 11) {
+                            Avatar(initials: p.author_initials, tint: FlowTheme.tint(["teal","sage","tealDark","ink","gray"][p.author_id % 5]), size: 40, seed: seed, imageURL: p.author_avatar_url)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(p.author_name).font(.system(size: 15, weight: .semibold)).foregroundStyle(FlowTheme.ink)
+                                Text(p.shortTime).font(FlowTheme.caption(11)).foregroundStyle(FlowTheme.gray)
+                            }
+                            Spacer()
+                        }
+                        if !p.content.isEmpty {
+                            Text(p.content).font(FlowTheme.body(15)).foregroundStyle(FlowTheme.ink)
+                                .multilineTextAlignment(.leading)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        if let url = p.image_url, let u = URL(string: url) {
+                            AsyncImage(url: u) { img in img.resizable().scaledToFill() } placeholder: { FlowTheme.beige }
+                                .frame(height: 160).frame(maxWidth: .infinity).clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
                     }
-                    Spacer()
                 }
-                if !p.content.isEmpty {
-                    Text(p.content).font(FlowTheme.body(15)).foregroundStyle(FlowTheme.ink)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                if let url = p.image_url, let u = URL(string: url) {
-                    AsyncImage(url: u) { img in img.resizable().scaledToFill() } placeholder: { FlowTheme.beige }
-                        .frame(height: 160).frame(maxWidth: .infinity).clipShape(RoundedRectangle(cornerRadius: 12))
-                }
+                .buttonStyle(.plain)
+
                 HStack(spacing: 20) {
                     Button { like(p) } label: {
                         HStack(spacing: 5) {
@@ -65,23 +77,81 @@ struct MomentsView: View {
                             Text("\(p.like_count)").font(FlowTheme.caption(13)).foregroundStyle(FlowTheme.gray)
                         }
                     }
-                    Button { commentsFor = p } label: {
+                    Button { toggleComments(p) } label: {
                         HStack(spacing: 5) {
-                            Image(systemName: "bubble.right").foregroundStyle(FlowTheme.gray)
+                            Image(systemName: "bubble.right").foregroundStyle(expanded.contains(p.id) ? FlowTheme.teal : FlowTheme.gray)
                             Text("\(p.comment_count)").font(FlowTheme.caption(13)).foregroundStyle(FlowTheme.gray)
                         }
                     }
                     Spacer()
                 }
                 .padding(.top, 2)
+
+                // 内联评论区（点评论按钮展开，无抽屉）
+                if expanded.contains(p.id) {
+                    Divider().overlay(FlowTheme.stroke)
+                    let list = commentCache[p.id] ?? []
+                    if !list.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(list) { cm in
+                                (Text(cm.user_name + "：").font(FlowTheme.caption(13).weight(.semibold)).foregroundStyle(FlowTheme.teal)
+                                 + Text(cm.content).font(FlowTheme.caption(13)).foregroundStyle(FlowTheme.ink))
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                    HStack(spacing: 8) {
+                        TextField(loc.t("moments.commentHint"), text: draftBinding(p.id))
+                            .font(FlowTheme.caption(14))
+                            .padding(.horizontal, 12).padding(.vertical, 8)
+                            .background(RoundedRectangle(cornerRadius: 16).fill(FlowTheme.field))
+                            .sketchBorder(16, width: 1.1, seed: seed &+ 1)
+                        Button { sendComment(p) } label: {
+                            Text(loc.t("moments.send")).font(FlowTheme.caption(13).weight(.semibold)).foregroundStyle(FlowTheme.teal)
+                        }
+                        .disabled((drafts[p.id] ?? "").trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+                }
             }
             .padding(16)
         }
     }
 
+    private func draftBinding(_ pid: Int) -> Binding<String> {
+        Binding(get: { drafts[pid] ?? "" }, set: { drafts[pid] = $0 })
+    }
+
+    private func toggleComments(_ p: MomentPost) {
+        if expanded.contains(p.id) { expanded.remove(p.id); return }
+        expanded.insert(p.id)
+        if commentCache[p.id] == nil {
+            Task {
+                let cs = (try? await APIClient.shared.listComments(postId: p.id)) ?? []
+                await MainActor.run { commentCache[p.id] = cs }
+            }
+        }
+    }
+
+    private func sendComment(_ p: MomentPost) {
+        let t = (drafts[p.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return }
+        drafts[p.id] = ""
+        Task {
+            if let cm = try? await APIClient.shared.addComment(postId: p.id, content: t) {
+                await MainActor.run {
+                    commentCache[p.id, default: []].append(cm)
+                    if let i = posts.firstIndex(where: { $0.id == p.id }) { posts[i].comment_count += 1 }
+                }
+            }
+        }
+    }
+
     private func reload() async {
         let ps = (try? await APIClient.shared.momentsFeed()) ?? []
-        await MainActor.run { posts = ps; loaded = true }
+        await MainActor.run {
+            posts = ps; loaded = true
+            commentCache = commentCache.filter { expanded.contains($0.key) }
+        }
     }
 
     private func like(_ p: MomentPost) {
@@ -183,45 +253,92 @@ struct ComposeMomentView: View {
     }
 }
 
-struct CommentsSheet: View {
+/// 朋友圈详情页（微信式）：完整动态 + 全部评论 + 底部评论输入。
+struct PostDetailView: View {
     @EnvironmentObject var loc: Localization
-    @Environment(\.dismiss) private var dismiss
     let post: MomentPost
-    var onChanged: () -> Void = {}
+    @State private var current: MomentPost
     @State private var comments: [MomentComment] = []
     @State private var draft = ""
 
+    init(post: MomentPost) {
+        self.post = post
+        _current = State(initialValue: post)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Text(loc.t("moments.comments")).font(FlowTheme.heading(18)).foregroundStyle(FlowTheme.ink)
-                Spacer()
-                Button { dismiss() } label: { Image(systemName: "xmark").foregroundStyle(FlowTheme.gray) }
-            }.padding(20)
             ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    ForEach(comments) { cm in
-                        HStack(alignment: .top, spacing: 10) {
-                            Avatar(initials: cm.initials, tint: FlowTheme.teal, size: 32)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(cm.user_name).font(FlowTheme.caption(12)).foregroundStyle(FlowTheme.gray)
-                                Text(cm.content).font(FlowTheme.body(15)).foregroundStyle(FlowTheme.ink)
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(spacing: 11) {
+                        Avatar(initials: current.author_initials, tint: FlowTheme.tint(["teal","sage","tealDark","ink","gray"][current.author_id % 5]), size: 44, imageURL: current.author_avatar_url)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(current.author_name).font(.system(size: 16, weight: .semibold)).foregroundStyle(FlowTheme.ink)
+                            Text(current.shortTime).font(FlowTheme.caption(11)).foregroundStyle(FlowTheme.gray)
+                        }
+                        Spacer()
+                    }
+                    if !current.content.isEmpty {
+                        Text(current.content).font(FlowTheme.body(16)).foregroundStyle(FlowTheme.ink)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if let url = current.image_url, let u = URL(string: url) {
+                        AsyncImage(url: u) { img in img.resizable().scaledToFill() } placeholder: { FlowTheme.beige }
+                            .frame(maxWidth: .infinity).frame(height: 200).clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    HStack(spacing: 5) {
+                        Button { like() } label: {
+                            Image(systemName: current.liked ? "heart.fill" : "heart").foregroundStyle(current.liked ? FlowTheme.teal : FlowTheme.gray)
+                        }
+                        Text("\(current.like_count)").font(FlowTheme.caption(13)).foregroundStyle(FlowTheme.gray)
+                    }
+                    Divider().overlay(FlowTheme.stroke)
+                    Text("\(loc.t("moments.comments"))（\(comments.count)）").font(FlowTheme.caption(13).weight(.semibold)).foregroundStyle(FlowTheme.gray)
+                    if comments.isEmpty {
+                        Text(loc.t("moments.noComments")).font(FlowTheme.caption(13)).foregroundStyle(FlowTheme.gray).padding(.vertical, 6)
+                    } else {
+                        ForEach(comments) { cm in
+                            HStack(alignment: .top, spacing: 10) {
+                                Avatar(initials: cm.initials, tint: FlowTheme.teal, size: 32)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(cm.user_name).font(FlowTheme.caption(12)).foregroundStyle(FlowTheme.gray)
+                                    Text(cm.content).font(FlowTheme.body(15)).foregroundStyle(FlowTheme.ink)
+                                }
+                                Spacer()
                             }
-                            Spacer()
                         }
                     }
-                }.padding(.horizontal, 20)
+                }
+                .padding(20)
             }
             HStack(spacing: 10) {
                 TextField(loc.t("moments.commentHint"), text: $draft)
                     .padding(.horizontal, 14).padding(.vertical, 10)
                     .background(RoundedRectangle(cornerRadius: 20).fill(FlowTheme.field)).sketchBorder(20, width: 1.3, seed: 92)
                 Button { add() } label: { PillButton(title: loc.t("moments.send"), radius: 20, seed: 93) }
+                    .disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty)
             }
             .padding(16)
         }
         .background(PaperBackground())
-        .task { comments = (try? await APIClient.shared.listComments(postId: post.id)) ?? [] }
+        .navigationTitle(loc.t("moments.detail"))
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await load() }
+    }
+
+    private func load() async {
+        if let d = try? await APIClient.shared.postDetail(postId: post.id) {
+            await MainActor.run { current = d.post; comments = d.comments }
+        }
+    }
+
+    private func like() {
+        Task {
+            if let r = try? await APIClient.shared.toggleLike(postId: current.id) {
+                await MainActor.run { current.liked = r.liked; current.like_count = r.like_count }
+                NotificationCenter.default.post(name: .flowMomentsChanged, object: nil)
+            }
+        }
     }
 
     private func add() {
@@ -229,9 +346,9 @@ struct CommentsSheet: View {
         guard !t.isEmpty else { return }
         draft = ""
         Task {
-            if let cm = try? await APIClient.shared.addComment(postId: post.id, content: t) {
+            if let cm = try? await APIClient.shared.addComment(postId: current.id, content: t) {
                 await MainActor.run { comments.append(cm) }
-                onChanged()
+                NotificationCenter.default.post(name: .flowMomentsChanged, object: nil)
             }
         }
     }

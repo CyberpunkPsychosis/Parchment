@@ -32,6 +32,9 @@ struct DiscoverView: View {
             .navigationDestination(for: PlazaGroup.self) { g in
                 CommunityDetailView(group: g)
             }
+            .navigationDestination(for: MomentPost.self) { p in
+                PostDetailView(post: p)
+            }
         }
     }
 

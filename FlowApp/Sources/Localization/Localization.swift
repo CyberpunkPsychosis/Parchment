@@ -97,6 +97,8 @@ final class Localization: ObservableObject {
         "moments.empty":   [.zh: "还没有动态，发一条吧", .en: "No posts yet — share something"],
         "moments.comments":[.zh: "评论", .en: "Comments"],
         "moments.commentHint":[.zh: "写评论…", .en: "Write a comment…"],
+        "moments.noComments":[.zh: "还没有评论，来抢沙发", .en: "No comments yet"],
+        "moments.detail":  [.zh: "动态", .en: "Moment"],
         "profile.message": [.zh: "发消息", .en: "Message"],
         "profile.edit":    [.zh: "编辑资料", .en: "Edit profile"],
         "profile.save":    [.zh: "保存", .en: "Save"],

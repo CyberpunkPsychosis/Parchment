@@ -11,13 +11,18 @@ struct MomentPost: Codable, Identifiable, Hashable {
     let created_at: String
     var like_count: Int
     var liked: Bool
-    let comment_count: Int
+    var comment_count: Int
 
     var shortTime: String {
         let parts = created_at.split(separator: "T")
         if parts.count == 2 { return "\(parts[0]) \(parts[1].prefix(5))" }
         return created_at
     }
+}
+
+struct PostDetailDTO: Codable, Hashable {
+    let post: MomentPost
+    let comments: [MomentComment]
 }
 
 struct MomentComment: Codable, Identifiable, Hashable {

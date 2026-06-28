@@ -58,6 +58,18 @@ def toggle_like(pid: int, user: User = Depends(get_current_user), db: Session = 
     return {"liked": liked, "like_count": count}
 
 
+@router.get("/moments/{pid}")
+def post_detail(pid: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """单条动态详情：帖子 + 全部评论（微信式详情页用）。"""
+    p = db.query(Post).filter(Post.id == pid).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="动态不存在")
+    rows = db.query(PostComment).filter(PostComment.post_id == pid).order_by(PostComment.created_at.asc()).all()
+    return {"post": _post_dict(db, p, user.id),
+            "comments": [{"id": r.id, "user_name": r.user_name, "initials": _initials(r.user_name),
+                          "content": r.content, "created_at": r.created_at.isoformat()} for r in rows]}
+
+
 @router.get("/moments/{pid}/comments")
 def comments(pid: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     rows = db.query(PostComment).filter(PostComment.post_id == pid).order_by(PostComment.created_at.asc()).all()
