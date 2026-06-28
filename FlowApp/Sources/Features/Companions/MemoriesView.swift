@@ -43,9 +43,16 @@ struct MemoriesView: View {
                     Spacer()
                 } else {
                     ScrollView {
-                        VStack(spacing: 10) {
-                            ForEach(memories) { m in row(m) }
+                        VStack(alignment: .leading, spacing: 16) {
+                            ForEach(sections, id: \.title) { sec in
+                                VStack(alignment: .leading, spacing: 10) {
+                                    Text(sec.title).font(FlowTheme.caption(12).weight(.bold))
+                                        .foregroundStyle(FlowTheme.teal)
+                                    ForEach(sec.items) { m in row(m) }
+                                }
+                            }
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(16)
                     }
                 }
@@ -59,16 +66,35 @@ struct MemoriesView: View {
         .task { await load() }
     }
 
+    /// 按来源分组：我和 ta / 群里每个人 / 历任主人。
+    private var sections: [(title: String, items: [Memory])] {
+        var out: [(String, [Memory])] = []
+        let own = memories.filter { $0.origin == nil }
+        let group = memories.filter { $0.origin != nil && $0.source == "group" }
+        let inherited = memories.filter { $0.origin != nil && $0.source == "inherited" }
+        if !own.isEmpty { out.append((loc.t("memories.sectionOwn"), own)) }
+        let byPerson = Dictionary(grouping: group) { $0.origin ?? "" }
+        for who in byPerson.keys.sorted() {
+            out.append(("\(loc.t("memories.fromGroup"))\(who)", byPerson[who] ?? []))
+        }
+        if !inherited.isEmpty { out.append((loc.t("memories.sectionInherited"), inherited)) }
+        return out
+    }
+
     private func row(_ m: Memory) -> some View {
         let shareable = m.visibility == "shareable"
+        let icon: String = {
+            if m.source == "group" { return "person.2.fill" }
+            if m.origin != nil { return "arrow.triangle.branch" }
+            return m.source == "manual" ? "hand.point.up.left" : "sparkles"
+        }()
         return HStack(spacing: 10) {
-            Image(systemName: m.origin != nil ? "arrow.triangle.branch"
-                  : (m.source == "manual" ? "hand.point.up.left" : "sparkles"))
+            Image(systemName: icon)
                 .font(.system(size: 13)).foregroundStyle(FlowTheme.teal)
             VStack(alignment: .leading, spacing: 2) {
                 Text(m.content).font(FlowTheme.body(14)).foregroundStyle(FlowTheme.ink)
                 if let o = m.origin {
-                    Text("\(loc.t("memories.from"))\(o)")
+                    Text("\(loc.t(m.source == "group" ? "memories.fromGroup" : "memories.from"))\(o)")
                         .font(.system(size: 10)).foregroundStyle(FlowTheme.teal)
                 }
             }

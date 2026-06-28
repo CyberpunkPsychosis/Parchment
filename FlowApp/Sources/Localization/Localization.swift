@@ -248,6 +248,9 @@ final class Localization: ObservableObject {
         "memories.addHint":    [.zh: "手动添加一条记忆…", .en: "Add a memory…"],
         "memories.add":        [.zh: "添加", .en: "Add"],
         "memories.from":       [.zh: "传承自 ", .en: "from "],
+        "memories.fromGroup":  [.zh: "来自 ", .en: "from "],
+        "memories.sectionOwn": [.zh: "我和 ta", .en: "About you"],
+        "memories.sectionInherited": [.zh: "历任主人的回忆", .en: "From past owners"],
         // AI 助手（输入栏）
         "assist.rewrite":      [.zh: "润色语气", .en: "Rewrite tone"],
         "assist.translate":    [.zh: "翻译 中⇄英", .en: "Translate"],

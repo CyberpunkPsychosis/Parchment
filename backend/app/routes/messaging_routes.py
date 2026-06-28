@@ -431,19 +431,84 @@ def add_member(cid: int, body: AddMemberIn,
 
 
 def _companion_system(db: Session, comp: Companion) -> str:
-    """搭子 persona + 注入记忆（与 chat_routes 一致的精简版）。"""
+    """搭子 persona + 注入记忆。区分：主人本人 / 群里大家 / 历任主人。"""
     mems = (db.query(Memory).filter(Memory.companion_id == comp.id)
-            .order_by(Memory.created_at.desc()).limit(40).all())
+            .order_by(Memory.created_at.desc()).limit(60).all())
     system = comp.persona
     own = [m for m in mems if not m.origin]
-    inherited = [m for m in mems if m.origin]
+    group = [m for m in mems if m.origin and m.source == "group"]
+    inherited = [m for m in mems if m.origin and m.source == "inherited"]
     if inherited:
         lines = "\n".join(f"- {m.origin}：{m.content}" for m in inherited)
         system += "\n\n[以前主人留下的回忆，属于他们本人，聊到相关话题可自然替他们提起]\n" + lines
+    if group:
+        lines = "\n".join(f"- {m.origin}：{m.content}" for m in group)
+        system += ("\n\n[这是你在群里陪伴大家时记住的事，按人区分——你记得群里的每一个人。"
+                   "聊到某人时可自然地提起你对 ta 的记忆，体现出你是大家共同养大的搭子]\n" + lines)
     if own:
         lines = "\n".join(f"- {m.content}" for m in own)
         system += "\n\n[关于现在和你聊天的人，你记得这些，自然运用]\n" + lines
     return system
+
+
+def _parse_obj_list(raw: str) -> list[dict]:
+    """从模型输出里抠出 JSON 对象数组（容忍 markdown 包裹）。"""
+    s = raw.strip()
+    a, b = s.find("["), s.rfind("]")
+    if a == -1 or b == -1 or b < a:
+        return []
+    try:
+        data = json.loads(s[a:b + 1])
+        return [d for d in data if isinstance(d, dict)]
+    except (ValueError, TypeError):
+        return []
+
+
+async def _learn_from_chat(db: Session, comp: Companion, cid: int, tier: str):
+    """群聊后提取记忆：多人→按贡献者标记(共同养成)；单人→记在主人名下。"""
+    rows = (db.query(Message).filter(
+                Message.conversation_id == cid, Message.kind == "text",
+                Message.sender_user_id.isnot(None))
+            .order_by(Message.created_at.desc()).limit(16).all())[::-1]
+    if not rows:
+        return
+    speakers, lines = set(), []
+    for m in rows:
+        info = serialize_message(db, m)
+        lines.append(f"{info['sender_name']}：{m.content}")
+        speakers.add(m.sender_user_id)
+    transcript = "\n".join(lines)
+    existing = {x.content for x in db.query(Memory).filter(Memory.companion_id == comp.id).all()}
+
+    if len(speakers) > 1:   # 群聊：共同养成，按人记
+        prompt = (
+            "你是这个群共同养的 AI 搭子。从下面群聊片段中，提取关于【群里每个人】"
+            "值得长期记住的事实（偏好、经历、在意的人或事、目标等）。每条简短具体；"
+            "严格只输出 JSON 数组，每项形如 {\"who\":\"说话人昵称\",\"fact\":\"一句话\"}，"
+            "没有值得记的就返回 []。\n\n群聊片段：\n" + transcript)
+        raw = await complete_chat(tier, [{"role": "user", "content": prompt}])
+        for it in _parse_obj_list(raw):
+            who = str(it.get("who") or "").strip()
+            fact = str(it.get("fact") or "").strip()
+            if who and fact and fact not in existing and len(fact) <= 200:
+                db.add(Memory(companion_id=comp.id, content=fact, source="group",
+                              origin=who, visibility="private"))
+                existing.add(fact)
+    else:                   # 单人私聊：记在主人本人名下
+        prompt = (
+            "从下面对话中，提取关于【对方本人】值得长期记住的事实"
+            "（偏好、经历、在意的人或事、目标）。每条一句话、简短具体；没有就返回空数组。"
+            "严格只输出 JSON 字符串数组，如 [\"喜欢猫\",\"在准备考研\"]。\n\n" + transcript)
+        raw = await complete_chat(tier, [{"role": "user", "content": prompt}])
+        try:
+            facts = [str(x).strip() for x in json.loads(raw[raw.find("["):raw.rfind("]") + 1])]
+        except (ValueError, TypeError):
+            facts = []
+        for fact in facts:
+            if fact and fact not in existing and len(fact) <= 200:
+                db.add(Memory(companion_id=comp.id, content=fact, source="auto", visibility="private"))
+                existing.add(fact)
+    db.commit()
 
 
 class AIReplyIn(BaseModel):
@@ -486,6 +551,11 @@ async def ai_reply(cid: int, body: AIReplyIn,
     db.commit(); db.refresh(out)
     touch(db, conv)
     await broadcast_message(db, conv, out)
+    # 共同养成：回复后从对话里学记忆（群按贡献者标记）
+    try:
+        await _learn_from_chat(db, comp, cid, tier)
+    except Exception:
+        pass
     payload = serialize_message(db, out)
     payload["companion_growth"] = comp.growth_dict()
     payload["leveled_up"] = leveled

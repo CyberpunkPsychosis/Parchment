@@ -44,8 +44,9 @@ async def chat_stream(body: ChatIn,
             mems = (db.query(Memory).filter(Memory.companion_id == companion.id)
                     .order_by(Memory.created_at.desc()).limit(40).all())
             system = companion.persona
-            own = [m for m in mems if not m.origin]            # 当前用户自己的
-            inherited = [m for m in mems if m.origin]          # 历任主人传承的回忆
+            own = [m for m in mems if not m.origin]                             # 当前用户自己的
+            group = [m for m in mems if m.origin and m.source == "group"]       # 群里大家贡献的
+            inherited = [m for m in mems if m.origin and m.source == "inherited"]  # 历任主人传承的
             if inherited:
                 lines = "\n".join(f"- {m.origin}：{m.content}" for m in inherited)
                 system += ("\n\n[以下是你陪伴过的【以前的主人】留给你的回忆，属于他们本人，"
@@ -53,6 +54,9 @@ async def chat_stream(body: ChatIn,
                            "比如「我记得以前的主人小云也…」「之前有位朋友跟我讲过…」；"
                            "当现在这个人聊到相似的事，可以主动说『我以前的主人也有过类似的经历呢』并分享。"
                            "千万不要把这些当成现在这个人的经历]\n" + lines)
+            if group:
+                lines = "\n".join(f"- {m.origin}：{m.content}" for m in group)
+                system += ("\n\n[这是你在群里陪伴大家时记住的事，按人区分——你记得群里的每一个人]\n" + lines)
             if own:
                 lines = "\n".join(f"- {m.content}" for m in own)
                 system += ("\n\n[以下是关于【现在正在和你聊天的人】的事，你记得这些。自然运用，别生硬罗列]\n" + lines)
