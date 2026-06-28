@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import UIKit
 
 /// 真实会话聊天页（私聊 / 群聊）。REST 拉历史 + 发送，WebSocket 实时收。
 /// 群聊渲染发送者头像与名字，支持加入 AI 搭子、@搭子回复、群聊总结、智能回复。
@@ -22,6 +23,7 @@ struct ConversationView: View {
     @State private var showMembers = false
     @State private var photoItem: PhotosPickerItem?
     @State private var profileRef: UserRef?
+    @State private var typingName: String?
 
     private var myId: Int? { auth.user?.id }
     private var aiMembers: [ConvMemberDTO] { members.filter { $0.is_ai } }
@@ -32,10 +34,17 @@ struct ConversationView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 12) {
-                        ForEach(messages) { m in
+                        ForEach(Array(messages.enumerated()), id: \.element.id) { idx, m in
+                            if idx == 0 || messages[idx - 1].day != m.day {
+                                Text(m.day).font(FlowTheme.caption(11)).foregroundStyle(FlowTheme.ink.opacity(0.45))
+                                    .padding(.vertical, 4)
+                            }
                             ConvBubble(msg: m, myId: myId, isGroup: conversation.is_group,
-                                       onAvatarTap: { uid in profileRef = UserRef(id: uid) }).id(m.id)
+                                       onAvatarTap: { uid in profileRef = UserRef(id: uid) },
+                                       onRecall: { recall(m) },
+                                       onReact: { e in react(m, e) }).id(m.id)
                         }
+                        if let typingName { Text("\(typingName) \(loc.t("chat.typing"))").font(FlowTheme.caption(11)).foregroundStyle(FlowTheme.gray).frame(maxWidth: .infinity, alignment: .leading) }
                         if aiBusy { HStack { ProgressView().tint(FlowTheme.teal); Spacer() }.padding(.leading, 8) }
                     }
                     .padding(.horizontal, 16).padding(.vertical, 12)
@@ -55,8 +64,25 @@ struct ConversationView: View {
         .task { await load() }
         .onReceive(NotificationCenter.default.publisher(for: .flowMessage)) { note in
             guard let m = note.object as? MessageDTO, m.conversation_id == conversation.id else { return }
-            appendUnique(m)
+            appendUnique(m); typingName = nil
             Task { try? await APIClient.shared.markConversationRead(conversationId: conversation.id) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .flowRecall)) { note in
+            guard let e = note.object as? SocketEnvelope, e.conversation_id == conversation.id, let mid = e.message_id else { return }
+            messages.removeAll { $0.id == mid }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .flowReaction)) { note in
+            guard let e = note.object as? SocketEnvelope, e.conversation_id == conversation.id, let mid = e.message_id,
+                  let i = messages.firstIndex(where: { $0.id == mid }) else { return }
+            messages[i].reactions = e.reactions
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .flowTyping)) { note in
+            guard let e = note.object as? SocketEnvelope, e.conversation_id == conversation.id else { return }
+            typingName = e.name
+            Task { try? await Task.sleep(nanoseconds: 3_000_000_000); await MainActor.run { if typingName == e.name { typingName = nil } } }
+        }
+        .onChange(of: draft) { _, v in
+            if !v.isEmpty { ChatSocket.shared.sendTyping(conversationId: conversation.id) }
         }
         .onAppear { ui.hideTabBar = true }
         .onDisappear { ui.hideTabBar = false }
@@ -117,6 +143,17 @@ struct ConversationView: View {
         await MainActor.run { aiBusy = true }
         let m = try? await APIClient.shared.aiReply(conversationId: conversation.id, companionId: companionId)
         await MainActor.run { if let m { appendUnique(m) }; aiBusy = false }
+    }
+
+    private func recall(_ m: MessageDTO) {
+        Task {
+            try? await APIClient.shared.recallMessage(m.id)
+            await MainActor.run { messages.removeAll { $0.id == m.id } }
+        }
+    }
+
+    private func react(_ m: MessageDTO, _ emoji: String) {
+        Task { try? await APIClient.shared.reactMessage(m.id, emoji: emoji) }
     }
 
     private func shareCompanion(_ id: Int) {
@@ -323,7 +360,10 @@ struct ConvBubble: View {
     let myId: Int?
     let isGroup: Bool
     var onAvatarTap: ((Int) -> Void)? = nil
+    var onRecall: () -> Void = {}
+    var onReact: (String) -> Void = {}
 
+    private let quickEmojis = ["👍", "❤️", "😂", "😮", "😢", "🙏"]
     private var mine: Bool { msg.sender_user_id != nil && msg.sender_user_id == myId }
 
     var body: some View {
@@ -339,7 +379,20 @@ struct ConvBubble: View {
                 if (isGroup || msg.is_ai) && !mine {
                     Text(msg.sender_name).font(FlowTheme.caption(11)).foregroundStyle(FlowTheme.gray)
                 }
-                bubble
+                bubble.contextMenu {
+                    if msg.kind == "text" { Button { UIPasteboard.general.string = msg.content } label: { Label("复制 Copy", systemImage: "doc.on.doc") } }
+                    Menu { ForEach(quickEmojis, id: \.self) { e in Button(e) { onReact(e) } } } label: { Label("回应 React", systemImage: "face.smiling") }
+                    if mine { Button(role: .destructive) { onRecall() } label: { Label("撤回 Recall", systemImage: "arrow.uturn.backward") } }
+                }
+                if let rs = msg.reactions, !rs.isEmpty {
+                    HStack(spacing: 4) {
+                        ForEach(rs, id: \.emoji) { r in
+                            Text("\(r.emoji)\(r.count)").font(.system(size: 11))
+                                .padding(.horizontal, 6).padding(.vertical, 2)
+                                .background(Capsule().fill(FlowTheme.beige))
+                        }
+                    }
+                }
                 Text(msg.shortTime).font(FlowTheme.caption(9)).foregroundStyle(FlowTheme.ink.opacity(0.5))
             }
             if !mine { Spacer(minLength: 48) }

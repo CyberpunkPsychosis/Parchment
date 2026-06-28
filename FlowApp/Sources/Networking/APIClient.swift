@@ -365,6 +365,16 @@ final class APIClient {
         _ = try await URLSession.shared.data(for: req)
     }
 
+    func recallMessage(_ mid: Int) async throws {
+        let req = try makeRequest("/messages/\(mid)/recall", method: "POST")
+        _ = try await URLSession.shared.data(for: req)
+    }
+
+    func reactMessage(_ mid: Int, emoji: String) async throws {
+        let req = try makeRequest("/messages/\(mid)/react", method: "POST", body: ["emoji": emoji])
+        _ = try await URLSession.shared.data(for: req)
+    }
+
     func conversationMembers(_ cid: Int) async throws -> [ConvMemberDTO] {
         struct R: Decodable { let members: [ConvMemberDTO] }
         let req = try makeRequest("/conversations/\(cid)/members", method: "GET")

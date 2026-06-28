@@ -47,8 +47,10 @@ struct MessageDTO: Codable, Identifiable, Hashable {
     var sender_avatar_url: String?
     let sender_tint: String
     let is_ai: Bool
+    var reactions: [MsgReaction]? = nil
 
     var senderColor: Color { FlowTheme.tint(sender_tint) }
+    var day: String { String(created_at.prefix(10)) }
     var shortTime: String {
         if let t = created_at.split(separator: "T").last { return String(t.prefix(5)) }
         return ""
@@ -71,14 +73,26 @@ struct ConvMemberDTO: Codable, Identifiable, Hashable {
 
 // MARK: - WebSocket 实时投递
 
-extension Notification.Name {
-    static let flowMessage = Notification.Name("flow.message")
+struct MsgReaction: Codable, Hashable {
+    let emoji: String
+    let count: Int
 }
 
-private struct SocketEnvelope: Decodable {
+extension Notification.Name {
+    static let flowMessage = Notification.Name("flow.message")
+    static let flowRecall = Notification.Name("flow.recall")
+    static let flowReaction = Notification.Name("flow.reaction")
+    static let flowTyping = Notification.Name("flow.typing")
+}
+
+struct SocketEnvelope: Decodable {
     let type: String
     let conversation_id: Int?
     let message: MessageDTO?
+    let message_id: Int?
+    let reactions: [MsgReaction]?
+    let user_id: Int?
+    let name: String?
 }
 
 /// 单例 WebSocket。收到消息后用 NotificationCenter 广播 MessageDTO；
@@ -136,10 +150,24 @@ final class ChatSocket {
 
     private func dispatch(_ text: String) {
         guard let data = text.data(using: .utf8),
-              let env = try? JSONDecoder().decode(SocketEnvelope.self, from: data),
-              env.type == "message", let m = env.message else { return }
+              let env = try? JSONDecoder().decode(SocketEnvelope.self, from: data) else { return }
         DispatchQueue.main.async {
-            NotificationCenter.default.post(name: .flowMessage, object: m)
+            switch env.type {
+            case "message": if let m = env.message { NotificationCenter.default.post(name: .flowMessage, object: m) }
+            case "recall":  NotificationCenter.default.post(name: .flowRecall, object: env)
+            case "reaction": NotificationCenter.default.post(name: .flowReaction, object: env)
+            case "typing":  NotificationCenter.default.post(name: .flowTyping, object: env)
+            default: break
+            }
+        }
+    }
+
+    /// 发送"正在输入"。
+    func sendTyping(conversationId: Int) {
+        let payload: [String: Any] = ["type": "typing", "conversation_id": conversationId]
+        if let d = try? JSONSerialization.data(withJSONObject: payload),
+           let s = String(data: d, encoding: .utf8) {
+            task?.send(.string(s)) { _ in }
         }
     }
 

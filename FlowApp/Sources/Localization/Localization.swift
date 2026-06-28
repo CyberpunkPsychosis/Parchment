@@ -40,6 +40,7 @@ final class Localization: ObservableObject {
         "conv.summarize":  [.zh: "总结群聊", .en: "Summarize"],
         "conv.smartReply": [.zh: "智能回复", .en: "Smart reply"],
         "conv.summary":    [.zh: "群聊总结", .en: "Summary"],
+        "chat.typing":     [.zh: "正在输入…", .en: "is typing…"],
         "conv.shareCompanion":[.zh: "分享搭子名片", .en: "Share companion"],
         "conv.members.manage":[.zh: "群成员", .en: "Members"],
         "conv.leave":      [.zh: "退出群聊", .en: "Leave group"],
