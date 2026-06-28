@@ -39,6 +39,7 @@ final class Localization: ObservableObject {
         "conv.addAI":      [.zh: "加入 AI 搭子", .en: "Add AI companion"],
         "conv.summon":     [.zh: "让", .en: "Ask "],
         "conv.aiTag":      [.zh: "搭子", .en: "AI"],
+        "card.companion":  [.zh: "搭子名片", .en: "Companion card"],
         "growth.levelUp":  [.zh: "升级啦！", .en: "leveled up!"],
         "growth.profile":  [.zh: "成长档案", .en: "Growth profile"],
         "growth.affinity": [.zh: "亲密度", .en: "Affinity"],

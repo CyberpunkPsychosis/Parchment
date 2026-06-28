@@ -682,7 +682,11 @@ struct CompanionCard: View {
                 Avatar(initials: avatar, tint: FlowTheme.tint(tint), size: 40)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(name).font(.system(size: 15, weight: .semibold)).foregroundStyle(FlowTheme.ink)
-                    Text("🤖 AI 搭子名片").font(FlowTheme.caption(11)).foregroundStyle(FlowTheme.gray)
+                    HStack(spacing: 3) {
+                        Image(systemName: "pawprint.fill").font(.system(size: 9))
+                        Text(loc.t("card.companion"))
+                    }
+                    .font(FlowTheme.caption(11)).foregroundStyle(FlowTheme.gray)
                 }
             }
             if !persona.isEmpty {
@@ -792,7 +796,7 @@ struct GroupMembersView: View {
                                     .padding(.horizontal, 7).padding(.vertical, 3).background(Capsule().fill(FlowTheme.teal))
                             }
                             if m.is_ai {
-                                Text("AI").font(.system(size: 10, weight: .bold)).foregroundStyle(FlowTheme.teal)
+                                Text(loc.t("conv.aiTag")).font(.system(size: 10, weight: .bold)).foregroundStyle(FlowTheme.teal)
                                     .padding(.horizontal, 7).padding(.vertical, 3).background(Capsule().fill(FlowTheme.teal.opacity(0.15)))
                             }
                             Spacer()
