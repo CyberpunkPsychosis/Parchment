@@ -11,8 +11,25 @@ struct AppUser: Codable, Equatable {
     var tier: String          // "free" | "pro"
     var tier_expiry: String?
     var auto_send_stickers: Bool?   // null=首次未选
+    var is_admin: Bool? = nil       // 运营管理员
 
     var isPro: Bool { tier == "pro" }
+    var isAdmin: Bool { is_admin == true }
+}
+
+/// 解码占位：仅需状态校验、不关心响应体的接口用它（忽略所有字段）。
+struct EmptyResponse: Decodable {}
+
+struct AdminStats: Decodable { let real_users: Int; let fake_users: Int; let posts: Int; let has_assets: Bool }
+
+struct AdminFakeUser: Decodable, Identifiable, Hashable {
+    let id: Int
+    let nickname: String
+    var bio: String?
+    var avatar_url: String?
+    let post_count: Int
+    let companion_count: Int
+    let group_count: Int
 }
 
 struct Sticker: Codable, Identifiable, Hashable {
@@ -382,6 +399,48 @@ final class APIClient {
     func clearAssistantHistory() async throws {
         let req = try makeRequest("/assistant/history", method: "DELETE")
         _ = try await URLSession.shared.data(for: req)
+    }
+
+    // MARK: - 运营后台（管理员）
+    func adminStats() async throws -> AdminStats {
+        try await send(try makeRequest("/admin/stats", method: "GET"), as: AdminStats.self)
+    }
+    func adminListFakeUsers() async throws -> [AdminFakeUser] {
+        struct R: Decodable { let users: [AdminFakeUser] }
+        return try await send(try makeRequest("/admin/fake-users", method: "GET"), as: R.self).users
+    }
+    func adminCreateFakeUser(nickname: String?, bio: String?, avatarURL: String?) async throws -> AdminFakeUser {
+        struct B: Encodable { let nickname: String?; let bio: String?; let avatar_url: String? }
+        let req = try makeRequest("/admin/fake-users", method: "POST", body: B(nickname: nickname, bio: bio, avatar_url: avatarURL))
+        return try await send(req, as: AdminFakeUser.self)
+    }
+    func adminGenerate(count: Int) async throws {
+        let req = try makeRequest("/admin/fake-users/generate", method: "POST", body: ["count": count])
+        _ = try await URLSession.shared.data(for: req)
+    }
+    func adminPostMoment(uid: Int, content: String, imageURL: String?) async throws {
+        struct B: Encodable { let content: String; let image_url: String? }
+        let req = try makeRequest("/admin/fake-users/\(uid)/moments", method: "POST", body: B(content: content, image_url: imageURL))
+        _ = try await send(req, as: EmptyResponse.self)
+    }
+    func adminMakeCompanion(uid: Int, name: String, persona: String, greeting: String, tint: String) async throws {
+        struct B: Encodable { let name: String; let persona: String; let greeting: String; let tint: String }
+        let req = try makeRequest("/admin/fake-users/\(uid)/companions", method: "POST", body: B(name: name, persona: persona, greeting: greeting, tint: tint))
+        _ = try await send(req, as: EmptyResponse.self)
+    }
+    func adminMakeGroup(uid: Int, name: String, description: String, memberSeedUsers: Int) async throws {
+        struct B: Encodable { let name: String; let description: String; let member_seed_users: Int }
+        let req = try makeRequest("/admin/fake-users/\(uid)/groups", method: "POST", body: B(name: name, description: description, member_seed_users: memberSeedUsers))
+        _ = try await send(req, as: EmptyResponse.self)
+    }
+    func adminDeleteFakeUser(uid: Int) async throws {
+        _ = try await URLSession.shared.data(for: try makeRequest("/admin/fake-users/\(uid)", method: "DELETE"))
+    }
+    func adminWipeAllFakeData() async throws {
+        _ = try await URLSession.shared.data(for: try makeRequest("/admin/fake-data", method: "DELETE"))
+    }
+    func adminDailyTick() async throws {
+        _ = try await URLSession.shared.data(for: try makeRequest("/admin/seed/daily-tick", method: "POST"))
     }
 
     /// 打开（或创建）与某搭子的 1:1 持久化会话。

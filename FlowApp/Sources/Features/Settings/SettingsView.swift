@@ -8,6 +8,7 @@ struct SettingsView: View {
     @State private var cacheText = "—"
     @State private var cacheCleared = false
     @State private var showBlocklist = false
+    @State private var showAdmin = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -58,6 +59,21 @@ struct SettingsView: View {
                             .frame(width: 160)
                         }
                         .padding(18)
+                    }
+
+                    // 运营后台（仅管理员可见）
+                    if auth.user?.isAdmin == true {
+                        Card {
+                            Button { showAdmin = true } label: {
+                                HStack {
+                                    Image(systemName: "wand.and.stars").foregroundStyle(FlowTheme.teal)
+                                    Text(loc.t("admin.title")).font(FlowTheme.body(16)).foregroundStyle(FlowTheme.ink)
+                                    Spacer()
+                                    Image(systemName: "chevron.right").foregroundStyle(FlowTheme.gray)
+                                }
+                                .padding(18)
+                            }
+                        }
                     }
 
                     // 黑名单管理
@@ -129,6 +145,9 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showBlocklist) {
             BlockListView().environmentObject(loc)
+        }
+        .sheet(isPresented: $showAdmin) {
+            AdminView().environmentObject(loc)
         }
         .alert(loc.t("settings.cacheCleared"), isPresented: $cacheCleared) {
             Button("OK", role: .cancel) {}
