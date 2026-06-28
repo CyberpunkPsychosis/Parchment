@@ -62,6 +62,29 @@ def ensure_direct(db: Session, a: int, b: int) -> Conversation:
     return c
 
 
+def ensure_companion_conversation(db: Session, user: User, comp: Companion) -> Conversation:
+    """取或建某用户与某搭子的 1:1 持久化会话（type=companion）。新建时落开场白。"""
+    rows = (db.query(Conversation)
+            .filter(Conversation.type == "companion").all())
+    for c in rows:
+        mems = db.query(ConversationMember).filter(ConversationMember.conversation_id == c.id).all()
+        uids = {m.user_id for m in mems if m.user_id}
+        cids = {m.companion_id for m in mems if m.companion_id}
+        if uids == {user.id} and cids == {comp.id}:
+            return c
+    c = Conversation(type="companion", title=comp.name)
+    db.add(c); db.commit(); db.refresh(c)
+    db.add(ConversationMember(conversation_id=c.id, user_id=user.id, role="owner"))
+    db.add(ConversationMember(conversation_id=c.id, companion_id=comp.id))
+    db.commit()
+    # 开场白（持久化，重进可见）
+    if (comp.greeting or "").strip():
+        db.add(Message(conversation_id=c.id, sender_companion_id=comp.id,
+                       kind="text", content=comp.greeting.strip()))
+        db.commit()
+    return c
+
+
 def ensure_group_conversation(db: Session, group: Group) -> Conversation:
     """取或建某群的群聊会话，并把现有群成员补进会话。"""
     c = db.query(Conversation).filter(
@@ -158,6 +181,7 @@ def conv_dict(db: Session, conv: Conversation, uid: int) -> dict:
         cm = next((m for m in members if m.companion_id), None)
         c = db.query(Companion).filter(Companion.id == cm.companion_id).first() if cm else None
         title = c.name if c else "AI"; avatar = c.avatar if c else "AI"; tint = c.tint if c else "teal"
+        avatar_url = c.avatar_url if c else None
     else:  # direct
         other = next((m for m in human if m.user_id != uid), None)
         u = db.query(User).filter(User.id == other.user_id).first() if other else None
@@ -282,7 +306,8 @@ async def ws_endpoint(ws: WebSocket, token: str = Query(default="")):
 def list_conversations(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     ids = [m.conversation_id for m in db.query(ConversationMember)
            .filter(ConversationMember.user_id == user.id).all()]
-    rows = (db.query(Conversation).filter(Conversation.id.in_(ids))
+    # 搭子 1:1 会话不进消息列表（只从「搭子」tab 进）
+    rows = (db.query(Conversation).filter(Conversation.id.in_(ids), Conversation.type != "companion")
             .order_by(Conversation.updated_at.desc()).all() if ids else [])
     out = [conv_dict(db, c, user.id) for c in rows]
     # 时间新→旧，再把置顶稳定提前
@@ -340,6 +365,22 @@ def create_conversation(body: NewConversation,
         c = ensure_group_conversation(db, g)
         return conv_dict(db, c, user.id)
     raise HTTPException(status_code=400, detail="不支持的会话类型")
+
+
+class CompanionConvIn(BaseModel):
+    companion_id: int
+
+
+@router.post("/conversations/companion")
+def open_companion_conversation(body: CompanionConvIn,
+                                user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """打开（或创建）与某搭子的 1:1 持久化会话。"""
+    comp = db.query(Companion).filter(Companion.id == body.companion_id,
+                                      Companion.owner_id == user.id).first()
+    if not comp:
+        raise HTTPException(status_code=404, detail="搭子不存在或非本人")
+    c = ensure_companion_conversation(db, user, comp)
+    return conv_dict(db, c, user.id)
 
 
 FRIEND_GROUP_CAP_DEFAULT = 500
@@ -550,9 +591,11 @@ async def _learn_from_chat(db: Session, comp: Companion, cid: int, tier: str):
                 existing.add(fact)
     else:                   # 单人私聊：记在主人本人名下
         prompt = (
-            "从下面对话中，提取关于【对方本人】值得长期记住的事实"
-            "（偏好、经历、在意的人或事、目标）。每条一句话、简短具体；没有就返回空数组。"
-            "严格只输出 JSON 字符串数组，如 [\"喜欢猫\",\"在准备考研\"]。\n\n" + transcript)
+            "下面是【用户本人】说过的话（不含 AI 的回复）。请只提取关于这个用户值得长期"
+            "记住的事实（偏好、经历、在意的人或事、目标）。只总结用户自己的事，"
+            "绝不要把 AI/搭子的话、安慰或建议当成用户的事实，也不要臆造。"
+            "每条一句话、简短具体；没有就返回空数组。"
+            "严格只输出 JSON 字符串数组，如 [\"喜欢猫\",\"在准备考研\"]。\n\n用户说过：\n" + transcript)
         raw = await complete_chat(tier, [{"role": "user", "content": prompt}])
         try:
             facts = [str(x).strip() for x in json.loads(raw[raw.find("["):raw.rfind("]") + 1])]

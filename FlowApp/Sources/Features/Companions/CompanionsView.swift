@@ -10,6 +10,8 @@ struct CompanionsView: View {
     @State private var publishTarget: Companion?
     @State private var detailTarget: Companion?
     @State private var editTarget: Companion?
+    @State private var chatRoute: ConversationDTO?
+    @State private var opening = false
 
     var body: some View {
         NavigationStack {
@@ -21,7 +23,7 @@ struct CompanionsView: View {
                     ScrollView {
                         LazyVStack(spacing: 14) {
                             ForEach(Array(companions.enumerated()), id: \.element.id) { idx, c in
-                                NavigationLink(value: c) {
+                                Button { openChat(c) } label: {
                                     CompanionRow(companion: c, seed: UInt64(idx + 100))
                                 }
                                 .buttonStyle(.plain)
@@ -47,13 +49,8 @@ struct CompanionsView: View {
                 }
             }
             .background(PaperBackground())
-            .navigationDestination(for: Companion.self) { c in
-                ChatDetailView(
-                    chat: c.asChat,
-                    persona: c.persona,
-                    companionId: c.id,
-                    seedMessages: c.greeting.isEmpty ? [] : [Message(kind: .text(c.greeting), mine: false, time: "")]
-                )
+            .navigationDestination(item: $chatRoute) { conv in
+                ConversationView(conversation: conv)
             }
         }
         .sheet(isPresented: $showCreate) {
@@ -101,6 +98,15 @@ struct CompanionsView: View {
         loading = true
         companions = (try? await APIClient.shared.listCompanions()) ?? []
         loading = false
+    }
+
+    private func openChat(_ c: Companion) {
+        guard !opening else { return }
+        opening = true
+        Task {
+            let conv = try? await APIClient.shared.openCompanionConversation(companionId: c.id)
+            await MainActor.run { opening = false; if let conv { chatRoute = conv } }
+        }
     }
 
     private func delete(_ c: Companion) {

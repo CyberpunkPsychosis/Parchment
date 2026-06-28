@@ -95,11 +95,13 @@ async def chat_stream(body: ChatIn,
 async def _auto_extract(db: Session, companion_id: int, tier: str, user_msg: str, reply: str):
     """从本轮对话提取关于用户的长期事实，存为记忆。"""
     prompt = (
-        "从下面这轮对话中，提取关于【用户本人】值得长期记住的事实"
+        "下面是一轮对话。只提取关于【用户】值得长期记住的事实"
         "（如偏好、经历、在意的人或事、目标、重要信息）。"
+        "只总结『用户:』那一行里用户自己的事；"
+        "『搭子:』是 AI 的回复，仅作上下文，绝不要把 AI 说的话、安慰或建议当成用户的事实，也不要臆造。"
         "每条一句话、简短具体；没有值得记的就返回空数组。"
         "严格只输出 JSON 字符串数组，如 [\"喜欢猫\",\"在准备考研\"]。\n\n"
-        f"用户说：{user_msg}\n回复：{reply}"
+        f"用户: {user_msg}\n搭子: {reply}"
     )
     raw = await complete_chat(tier, [{"role": "user", "content": prompt}])
     facts = _parse_list(raw)

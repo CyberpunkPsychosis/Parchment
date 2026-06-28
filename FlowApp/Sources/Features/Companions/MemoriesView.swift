@@ -10,6 +10,7 @@ struct MemoriesView: View {
     @State private var memories: [Memory] = []
     @State private var loading = true
     @State private var newMemory = ""
+    @State private var showClearConfirm = false
 
     var body: some View {
         ZStack {
@@ -63,7 +64,23 @@ struct MemoriesView: View {
                 Image(systemName: "xmark.circle.fill").font(.system(size: 26)).foregroundStyle(FlowTheme.gray.opacity(0.6))
             }.padding(16)
         }
+        .overlay(alignment: .topLeading) {
+            if !memories.isEmpty {
+                Button { showClearConfirm = true } label: {
+                    Image(systemName: "trash").font(.system(size: 17)).foregroundStyle(FlowTheme.gray)
+                }.padding(16)
+            }
+        }
+        .alert(loc.t("memories.clearConfirm"), isPresented: $showClearConfirm) {
+            Button(loc.t("memories.clear"), role: .destructive) { clearAll() }
+            Button(loc.t("common.cancel"), role: .cancel) {}
+        }
         .task { await load() }
+    }
+
+    private func clearAll() {
+        memories = []
+        Task { try? await APIClient.shared.clearMemories(companionId: companionId) }
     }
 
     /// 按来源分组：我和 ta / 群里每个人 / 历任主人。

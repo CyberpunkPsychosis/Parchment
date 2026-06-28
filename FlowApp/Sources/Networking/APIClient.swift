@@ -364,6 +364,18 @@ final class APIClient {
         return try await send(req, as: ConversationDTO.self)
     }
 
+    /// 打开（或创建）与某搭子的 1:1 持久化会话。
+    func openCompanionConversation(companionId: Int) async throws -> ConversationDTO {
+        let req = try makeRequest("/conversations/companion", method: "POST", body: ["companion_id": companionId])
+        return try await send(req, as: ConversationDTO.self)
+    }
+
+    /// 清空某搭子的全部记忆。
+    func clearMemories(companionId: Int) async throws {
+        let req = try makeRequest("/companions/\(companionId)/memories", method: "DELETE")
+        _ = try await URLSession.shared.data(for: req)
+    }
+
     func openGroupConversation(groupId: Int) async throws -> ConversationDTO {
         struct B: Encodable { let type = "group"; let group_id: Int }
         let req = try makeRequest("/conversations", method: "POST", body: B(group_id: groupId))

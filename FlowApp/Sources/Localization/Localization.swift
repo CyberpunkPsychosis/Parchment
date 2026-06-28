@@ -291,6 +291,8 @@ final class Localization: ObservableObject {
         "memories.fromGroup":  [.zh: "来自 ", .en: "from "],
         "memories.sectionOwn": [.zh: "我和 ta", .en: "About you"],
         "memories.sectionInherited": [.zh: "历任主人的回忆", .en: "From past owners"],
+        "memories.clear":      [.zh: "清空记忆", .en: "Clear all"],
+        "memories.clearConfirm": [.zh: "确定清空这个搭子的全部记忆？", .en: "Clear all memories for this companion?"],
         // AI 助手（输入栏）
         "assist.rewrite":      [.zh: "润色语气", .en: "Rewrite tone"],
         "assist.translate":    [.zh: "翻译 中⇄英", .en: "Translate"],

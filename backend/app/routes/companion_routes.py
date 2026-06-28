@@ -165,6 +165,15 @@ def delete_memory(mid: int, user: User = Depends(get_current_user), db: Session 
     return {"ok": True}
 
 
+@router.delete("/companions/{cid}/memories")
+def clear_memories(cid: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """一键清空该搭子的全部记忆。"""
+    _owned(db, user, cid)
+    n = db.query(Memory).filter(Memory.companion_id == cid).delete()
+    db.commit()
+    return {"ok": True, "deleted": n}
+
+
 # ---------- J：亲密度 + 里程碑 ----------
 
 def _exists(db: Session, cid: int) -> Companion:
