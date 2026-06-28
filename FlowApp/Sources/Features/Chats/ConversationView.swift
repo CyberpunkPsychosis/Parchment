@@ -25,6 +25,8 @@ struct ConversationView: View {
     @State private var profileRef: UserRef?
     @State private var typingName: String?
     @State private var mentionQuery: String?
+    @State private var levelUpToast: String?
+    @State private var headerGrowth: CompanionGrowth?
 
     private var myId: Int? { auth.user?.id }
     private var aiMembers: [ConvMemberDTO] { members.filter { $0.is_ai } }
@@ -69,6 +71,20 @@ struct ConversationView: View {
             inputBar
         }
         .background(PaperBackground())
+        .overlay(alignment: .top) {
+            if let levelUpToast {
+                HStack(spacing: 6) {
+                    Image(systemName: "sparkles").font(.system(size: 13))
+                    Text(levelUpToast).font(FlowTheme.caption(13))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 16).padding(.vertical, 10)
+                .background(Capsule().fill(FlowTheme.teal))
+                .padding(.top, 70)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.spring(response: 0.4), value: levelUpToast)
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .task { await load() }
@@ -128,6 +144,15 @@ struct ConversationView: View {
         if let mem = try? await APIClient.shared.conversationMembers(conversation.id) {
             await MainActor.run { members = mem }
         }
+        // 单搭子会话：拉取其当前等级用于头部展示
+        if let cid = aiMembers.count == 1 ? aiMembers.first?.companion_id : nil,
+           let comps = try? await APIClient.shared.listCompanions(),
+           let c = comps.first(where: { $0.id == cid }) {
+            await MainActor.run {
+                headerGrowth = CompanionGrowth(exp: c.exp, level: c.level, stage: c.stage,
+                                               level_min_exp: c.level_min_exp, level_max_exp: c.level_max_exp)
+            }
+        }
         try? await APIClient.shared.markConversationRead(conversationId: conversation.id)
     }
 
@@ -176,7 +201,24 @@ struct ConversationView: View {
     private func summon(_ companionId: Int) async {
         await MainActor.run { aiBusy = true }
         let m = try? await APIClient.shared.aiReply(conversationId: conversation.id, companionId: companionId)
-        await MainActor.run { if let m { appendUnique(m) }; aiBusy = false }
+        await MainActor.run {
+            if let m {
+                appendUnique(m)
+                if let g = m.companion_growth { headerGrowth = g }
+                if m.leveled_up == true, let g = m.companion_growth {
+                    showLevelUp("\(m.sender_name) \(loc.t("growth.levelUp")) Lv.\(g.level) · \(g.stage)")
+                }
+            }
+            aiBusy = false
+        }
+    }
+
+    private func showLevelUp(_ text: String) {
+        levelUpToast = text
+        Task {
+            try? await Task.sleep(nanoseconds: 2_600_000_000)
+            await MainActor.run { if levelUpToast == text { levelUpToast = nil } }
+        }
     }
 
     private func recall(_ m: MessageDTO) {
@@ -240,7 +282,12 @@ struct ConversationView: View {
             }
             Avatar(initials: conversation.avatar, tint: conversation.tintColor, size: 38, imageURL: conversation.avatar_url)
             VStack(alignment: .leading, spacing: 2) {
-                Text(conversation.title).font(.system(size: 16, weight: .semibold)).foregroundStyle(FlowTheme.ink)
+                HStack(spacing: 6) {
+                    Text(conversation.title).font(.system(size: 16, weight: .semibold)).foregroundStyle(FlowTheme.ink)
+                    if let g = headerGrowth {
+                        LevelBadge(level: g.level, stage: g.stage, tint: conversation.tintColor)
+                    }
+                }
                 if conversation.is_group {
                     Text("\(members.count) \(loc.t("conv.members"))").font(FlowTheme.caption(12)).foregroundStyle(FlowTheme.gray)
                 } else {

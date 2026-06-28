@@ -65,10 +65,17 @@ async def chat_stream(body: ChatIn,
             if "delta" in ev:
                 reply_parts.append(ev["delta"])
             yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
-        # 回复结束 → 自动提取记忆（不计用量）
+        # 回复结束 → 自动提取记忆（不计用量）+ 涨经验
         if companion is not None and last_user:
             try:
                 await _auto_extract(db, companion.id, tier, last_user, "".join(reply_parts))
+            except Exception:
+                pass
+            try:
+                leveled = companion.add_exp()
+                db.commit()
+                growth = {"growth": companion.growth_dict(), "leveled_up": leveled}
+                yield f"data: {json.dumps(growth, ensure_ascii=False)}\n\n"
             except Exception:
                 pass
         yield "data: [DONE]\n\n"

@@ -481,10 +481,15 @@ async def ai_reply(cid: int, body: AIReplyIn,
     reply = await complete_chat(tier, msgs or [{"role": "user", "content": "（群里还没消息，请打个招呼）"}],
                                 system=_companion_system(db, comp))
     out = Message(conversation_id=cid, sender_companion_id=comp.id, kind="text", content=reply.strip())
-    db.add(out); db.commit(); db.refresh(out)
+    db.add(out)
+    leveled = comp.add_exp()   # 互动涨经验（按天封顶）
+    db.commit(); db.refresh(out)
     touch(db, conv)
     await broadcast_message(db, conv, out)
-    return serialize_message(db, out)
+    payload = serialize_message(db, out)
+    payload["companion_growth"] = comp.growth_dict()
+    payload["leveled_up"] = leveled
+    return payload
 
 
 class ShareCompanionIn(BaseModel):

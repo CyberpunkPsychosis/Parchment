@@ -101,21 +101,57 @@ struct CompanionRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Avatar(initials: companion.avatar, tint: companion.tintColor, size: 46, seed: seed)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(companion.name)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(FlowTheme.ink)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(companion.name)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(FlowTheme.ink)
+                    LevelBadge(level: companion.level, stage: companion.stage, tint: companion.tintColor)
+                }
                 Text(companion.memory_count > 0
                      ? "\(loc.t("companion.memoryCount"))\(companion.memory_count)"
                      : companion.greeting)
                     .font(FlowTheme.caption(13))
                     .foregroundStyle(FlowTheme.gray)
                     .lineLimit(1)
+                ExpBar(progress: companion.levelProgress, tint: companion.tintColor)
             }
             Spacer(minLength: 8)
             Image(systemName: "sparkles").font(.system(size: 15)).foregroundStyle(FlowTheme.teal)
         }
         .padding(.horizontal, 14).padding(.vertical, 12)
         .sketchCard(18, fill: FlowTheme.card, seed: seed)
+    }
+}
+
+/// 等级 + 阶段小徽章。
+struct LevelBadge: View {
+    let level: Int
+    let stage: String
+    var tint: Color = FlowTheme.teal
+    var body: some View {
+        HStack(spacing: 4) {
+            Text("Lv.\(level)").font(.system(size: 10, weight: .bold))
+            Text(stage).font(.system(size: 10, weight: .medium))
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 7).padding(.vertical, 2)
+        .background(Capsule().fill(tint))
+    }
+}
+
+/// 经验进度条（细，手绘描边）。
+struct ExpBar: View {
+    let progress: Double
+    var tint: Color = FlowTheme.teal
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(FlowTheme.ink.opacity(0.08))
+                Capsule().fill(tint.opacity(0.85))
+                    .frame(width: max(3, geo.size.width * progress))
+            }
+        }
+        .frame(height: 4)
     }
 }

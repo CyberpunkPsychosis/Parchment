@@ -1,7 +1,33 @@
 """数据模型。User + 每日用量计数。会话历史暂不落库（无状态对话）。"""
+import math
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime, UniqueConstraint, Boolean
 from .db import Base
+
+# —— 搭子成长（共同养成核心）——
+EXP_PER_REPLY = 6      # 搭子每次回复获得的经验
+EXP_DAILY_CAP = 120    # 单只搭子每日经验上限（防刷）
+_STAGES = ["幼年", "成长", "成熟", "羁绊"]
+
+
+def companion_level(exp: int) -> int:
+    """由经验派生等级：升级所需经验递增（Lv 起点经验 = 50*(L-1)^2）。"""
+    return int(math.sqrt(max(0, exp) / 50.0)) + 1
+
+
+def companion_stage(level: int) -> str:
+    if level >= 15:
+        return _STAGES[3]
+    if level >= 8:
+        return _STAGES[2]
+    if level >= 3:
+        return _STAGES[1]
+    return _STAGES[0]
+
+
+def level_exp_bounds(level: int) -> tuple[int, int]:
+    """该等级的起点经验与下一级所需经验。"""
+    return 50 * (level - 1) ** 2, 50 * level ** 2
 
 
 class User(Base):
@@ -66,7 +92,35 @@ class Companion(Base):
     forked_from_snapshot_id = Column(Integer, nullable=True)  # 认领自哪个快照
     published_snapshot_id = Column(Integer, nullable=True)    # 当前发布的快照（None=未发布）
     visibility = Column(String, nullable=False, default="private")  # private | published
+    # —— 成长系统 ——
+    exp = Column(Integer, nullable=False, default=0)
+    exp_day = Column(String, nullable=True)        # 最近一次计经验的日期(YYYY-MM-DD)
+    exp_today = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    def add_exp(self, amount: int = EXP_PER_REPLY) -> bool:
+        """加经验（按天封顶）。返回是否因此升级。"""
+        today = datetime.utcnow().date().isoformat()
+        if self.exp_day != today:
+            self.exp_day = today
+            self.exp_today = 0
+        room = max(0, EXP_DAILY_CAP - (self.exp_today or 0))
+        gained = min(amount, room)
+        if gained <= 0:
+            return False
+        before = companion_level(self.exp or 0)
+        self.exp = (self.exp or 0) + gained
+        self.exp_today = (self.exp_today or 0) + gained
+        return companion_level(self.exp) > before
+
+    def growth_dict(self) -> dict:
+        exp = self.exp or 0
+        level = companion_level(exp)
+        lo, hi = level_exp_bounds(level)
+        return {
+            "exp": exp, "level": level, "stage": companion_stage(level),
+            "level_min_exp": lo, "level_max_exp": hi,
+        }
 
     def public_dict(self, memory_count: int = 0) -> dict:
         return {
@@ -75,6 +129,7 @@ class Companion(Base):
             "visibility": self.visibility, "memory_count": memory_count,
             "published": self.published_snapshot_id is not None,
             "adopted": self.forked_from_snapshot_id is not None,
+            **self.growth_dict(),
         }
 
 
