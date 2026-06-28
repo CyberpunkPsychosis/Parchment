@@ -21,6 +21,7 @@ targets:
     info:
       path: FlowApp/Info.plist
       properties:
+        CFBundleDisplayName: 羊皮纸
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait

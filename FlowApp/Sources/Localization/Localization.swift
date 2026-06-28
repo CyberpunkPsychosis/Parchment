@@ -21,7 +21,7 @@ final class Localization: ObservableObject {
 
     private static let table: [String: [Lang: String]] = [
         // App / nav
-        "app.name":        [.zh: "流动", .en: "FLOW"],
+        "app.name":        [.zh: "羊皮纸", .en: "Parchment"],
         "nav.chats":       [.zh: "聊天", .en: "Chats"],
         "nav.companions":  [.zh: "搭子", .en: "AI"],
         "nav.groups":      [.zh: "群组", .en: "Groups"],
@@ -192,7 +192,7 @@ final class Localization: ObservableObject {
         "publish.privacyNote":[.zh: "私密记忆永不分享。请勿公开他人隐私。", .en: "Private memories are never shared. Don't expose others' privacy."],
         // Settings
         "settings.title":     [.zh: "设置", .en: "Settings"],
-        "settings.switched":  [.zh: "流动模式", .en: "Switched mode"],
+        "settings.switched":  [.zh: "已切换", .en: "Switched mode"],
         "settings.clash":     [.zh: "冲突模式", .en: "Clash Mode"],
         "settings.sliders":   [.zh: "滑块", .en: "Sliders"],
         "settings.scheme":    [.zh: "滑块配色", .en: "Sliders scheme"],
@@ -212,8 +212,8 @@ final class Localization: ObservableObject {
         "footer.connectivity": [.zh: "已连接", .en: "Connected"],
         "footer.quick":        [.zh: "快捷访问", .en: "Quick access"],
         "footer.quickAI":      [.zh: "问 AI", .en: "Ask AI"],
-        "quick.aiName":        [.zh: "FLOW 助手", .en: "FLOW Assistant"],
-        "quick.aiGreeting":    [.zh: "嗨，我是 FLOW 助手，有什么可以帮你？", .en: "Hi! I'm the FLOW assistant. How can I help?"],
+        "quick.aiName":        [.zh: "羊皮纸助手", .en: "Parchment Assistant"],
+        "quick.aiGreeting":    [.zh: "嗨，我是羊皮纸助手，有什么可以帮你？", .en: "Hi! I'm the Parchment assistant. How can I help?"],
         "search.placeholder":  [.zh: "搜索", .en: "Search"],
         "search.hint":      [.zh: "搜索好友 / 群 / 搭子", .en: "Search people / groups / companions"],
         "search.friends":   [.zh: "好友", .en: "People"],
@@ -230,7 +230,7 @@ final class Localization: ObservableObject {
         "auth.createAccount":[.zh: "创建账号", .en: "Create account"],
         "auth.toRegister":   [.zh: "还没有账号？去注册", .en: "No account? Sign up"],
         "auth.toLogin":      [.zh: "已有账号？去登录", .en: "Have an account? Log in"],
-        "auth.tagline":      [.zh: "AI 驱动的聊天", .en: "AI-powered chat"],
+        "auth.tagline":      [.zh: "每一次交流，都是思想的痕迹", .en: "Every exchange leaves a trace"],
         "auth.logout":       [.zh: "退出登录", .en: "Log out"],
         "auth.account":      [.zh: "账号", .en: "Account"],
         "auth.member.free":  [.zh: "免费版", .en: "Free"],

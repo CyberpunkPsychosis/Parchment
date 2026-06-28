@@ -83,16 +83,19 @@ struct PaperBackground: View {
     }
 }
 
-/// The FLOW logo mark: "F" in a sketch-bordered block.
+/// 品牌字标：首字嵌在手绘墨块里 + 全名（随语言：羊皮纸 / Parchment）。
 struct FlowLogo: View {
+    @EnvironmentObject var loc: Localization
+    private var name: String { loc.t("app.name") }
+    private var mark: String { String(name.prefix(1)) }
     var body: some View {
         HStack(spacing: 8) {
-            Text("F")
+            Text(mark)
                 .font(.system(size: 17, weight: .bold, design: .serif))
                 .foregroundStyle(.white)
                 .frame(width: 30, height: 30)
                 .background(RoundedRectangle(cornerRadius: 9).fill(FlowTheme.ink))
-            Text("FLOW")
+            Text(name)
                 .font(.system(size: 22, weight: .bold, design: .serif))
                 .foregroundStyle(FlowTheme.ink)
         }
