@@ -399,11 +399,16 @@ struct GroupMembersView: View {
     @State private var members: [ConvMemberDTO] = []
 
     private var amOwner: Bool { members.first { $0.user_id == myId }?.role == "owner" }
+    private var countSuffix: String {
+        let humans = members.filter { !$0.is_ai }.count
+        if let cap = conversation.member_cap { return " \(humans)/\(cap)" }
+        return " \(humans)"
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text(loc.t("conv.members.manage")).font(FlowTheme.heading(20)).foregroundStyle(FlowTheme.ink)
+                Text(loc.t("conv.members.manage") + countSuffix).font(FlowTheme.heading(20)).foregroundStyle(FlowTheme.ink)
                 Spacer()
                 Button { dismiss() } label: { Image(systemName: "xmark").foregroundStyle(FlowTheme.gray) }
             }.padding(20)

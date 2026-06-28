@@ -260,16 +260,27 @@ def create_conversation(body: NewConversation,
     raise HTTPException(status_code=400, detail="不支持的会话类型")
 
 
+FRIEND_GROUP_CAP_DEFAULT = 500
+
+
+def _human_count(db: Session, cid: int) -> int:
+    return db.query(ConversationMember).filter(
+        ConversationMember.conversation_id == cid,
+        ConversationMember.user_id.isnot(None)).count()
+
+
 class NewFriendGroup(BaseModel):
     name: str = Field(default="", max_length=24)
     member_ids: list[int] = []
+    member_cap: int | None = Field(default=None, ge=2, le=2000)
 
 
 @router.post("/conversations/group")
 def create_friend_group(body: NewFriendGroup,
                         user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """好友内部群：不挂社群(group_id=None)，直接拉好友进会话。"""
-    c = Conversation(type="group", title=body.name.strip() or "群聊")
+    cap = body.member_cap or FRIEND_GROUP_CAP_DEFAULT
+    c = Conversation(type="group", title=body.name.strip() or "群聊", member_cap=cap)
     db.add(c); db.commit(); db.refresh(c)
     db.add(ConversationMember(conversation_id=c.id, user_id=user.id, role="owner"))
     for uid in set(body.member_ids):
@@ -355,6 +366,9 @@ def add_member(cid: int, body: AddMemberIn,
         if conv.type != "group":
             raise HTTPException(status_code=400, detail="仅群聊可加人")
         if not is_member(db, cid, body.user_id):
+            cap = conv.member_cap or FRIEND_GROUP_CAP_DEFAULT
+            if _human_count(db, cid) >= cap:
+                raise HTTPException(status_code=409, detail="群成员已满")
             db.add(ConversationMember(conversation_id=cid, user_id=body.user_id))
             db.commit()
     return conv_dict(db, conv, user.id)
