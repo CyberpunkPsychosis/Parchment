@@ -504,6 +504,8 @@ def add_member(cid: int, body: AddMemberIn,
     if not conv or not is_member(db, cid, user.id):
         raise HTTPException(status_code=403, detail="无权访问")
     if body.companion_id:
+        if conv.type != "group":
+            raise HTTPException(status_code=400, detail="只能往群聊里加搭子")
         c = db.query(Companion).filter(Companion.id == body.companion_id, Companion.owner_id == user.id).first()
         if not c:
             raise HTTPException(status_code=404, detail="搭子不存在或非本人")

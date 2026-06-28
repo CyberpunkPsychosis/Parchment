@@ -380,7 +380,10 @@ struct ConversationView: View {
                     Button { activeSheet = .bgPicker } label: { Label(loc.t("bg.title"), systemImage: "photo.on.rectangle") }
                     Button { runSuggest() } label: { Label(loc.t("conv.smartReply"), systemImage: "wand.and.stars") }
                 } else {
-                    Button { activeSheet = .addAI } label: { Label(loc.t("conv.addAI"), systemImage: "sparkles") }
+                    // 加搭子只在群里有意义；和真人 1:1 私聊不该把 AI 塞进去
+                    if conversation.is_group {
+                        Button { activeSheet = .addAI } label: { Label(loc.t("conv.addAI"), systemImage: "sparkles") }
+                    }
                     Button { activeSheet = .shareCompanion } label: { Label(loc.t("conv.shareCompanion"), systemImage: "person.crop.rectangle") }
                     Button { activeSheet = .bgPicker } label: { Label(loc.t("bg.title"), systemImage: "photo.on.rectangle") }
                     Button { runSuggest() } label: { Label(loc.t("conv.smartReply"), systemImage: "wand.and.stars") }
