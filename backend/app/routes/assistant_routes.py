@@ -12,7 +12,8 @@ from sqlalchemy.orm import Session
 
 from ..deps import get_current_user
 from ..db import get_db
-from ..models import User, Conversation, ConversationMember, Message, Post, Group, GroupMember
+from ..models import (User, Conversation, ConversationMember, Message, Post, Group, GroupMember,
+                      Companion, Memory)
 from ..providers import complete_chat
 from ..usage import consume
 from .messaging_routes import conv_dict, serialize_message
@@ -101,8 +102,25 @@ _SYS = """你是「羊皮纸助手」，帮用户在 App 内办事。根据用�
 - 分析最近的朋友圈/动态（如"今天谁想出去玩""大家最近在聊啥"）→ {"action":"analyze_moments","say":"好的，我看看朋友圈"}
 - 分析社群广场最近都有什么群/什么内容 → {"action":"analyze_plaza","say":"好的，我看看社群广场"}
 - 需要查最新资讯/上网搜（如"搜下今天的新闻""查查XX是什么"）→ {"action":"search","query":"搜索关键词","say":"我去查查"}
+- 先上网搜再发到某个群（如"搜条新闻发到家庭群"）→ {"action":"search_send","query":"搜索关键词","target":"群名","say":"好，我查完发给你确认"}
 规则：target 必须从【会话列表】里选最匹配的名字；想不出具体动作就用 answer。say 用中文、简短自然。
 【会话列表】：%s"""
+
+
+def _assistant_voice(db: Session, uid: int) -> str:
+    """让助手用"用户养的搭子"的口吻说话：取等级最高的那只，注入人设 + 几条记忆。"""
+    comp = (db.query(Companion).filter(Companion.owner_id == uid)
+            .order_by(Companion.exp.desc()).first())
+    if not comp:
+        return ("你是「羊皮纸助手」，像朋友一样口语化、简短、有活人感地帮用户。"
+                "别像客服或百科。")
+    mems = (db.query(Memory).filter(Memory.companion_id == comp.id, Memory.origin.is_(None))
+            .order_by(Memory.created_at.desc()).limit(6).all())
+    sys = (f"你是用户养的 AI 搭子「{comp.name}」，也是 ta 的贴身助手。{comp.persona}\n"
+           "用第一人称、口语化、有活人感、简短地回答，像熟人那样；别像客服或百科。")
+    if mems:
+        sys += "\n[你还记得关于 ta 的一些事，聊到相关自然带上]\n" + "\n".join(f"- {m.content}" for m in mems)
+    return sys
 
 
 class ActIn(BaseModel):
@@ -125,6 +143,7 @@ def _parse_json(raw: str) -> dict:
 async def act(body: ActIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     consume(db, user)
     tier = "pro" if user.is_pro else "free"
+    voice = _assistant_voice(db, user.id)   # 用"用户养的搭子"的口吻
     convs = _my_conversations(db, user.id)
     conv_names = "、".join(c["title"] for c in convs) or "（暂无会话）"
     raw = await complete_chat(tier, [{"role": "user", "content": body.text}],
@@ -197,8 +216,28 @@ async def act(body: ActIn, user: User = Depends(get_current_user), db: Session =
             return {"kind": "answer", "say": "联网搜索现在没查到结果（或后端未配置智谱 ZHIPU_API_KEY）。"}
         answer = await complete_chat(tier, [{"role": "user", "content":
             f"用户的问题：{body.text}\n\n下面是联网搜到的资料，请据此简洁回答，并在末尾附 1-3 条来源链接：\n{results}"}],
-            system="你是羊皮纸助手，根据联网搜索结果回答用户，简洁、准确、给出来源。", temperature=0.4)
+            system=voice + "\n根据下面联网搜索结果回答，准确、给出来源。", temperature=0.5)
         return {"kind": "answer", "say": answer.strip() or "我查到一些资料～"}
 
-    # 默认：直接回答
-    return {"kind": "answer", "say": say or raw.strip() or "嗯，我在听～"}
+    if action == "search_send":
+        target = _resolve(convs, plan.get("target", ""))
+        q = (plan.get("query") or body.text).strip()
+        if not target:
+            return {"kind": "answer", "say": say or "你想把搜到的内容发到哪个群呀？"}
+        results = await _web_search(q)
+        if not results:
+            return {"kind": "answer", "say": "联网搜索现在没查到结果（或后端未配置智谱 ZHIPU_API_KEY）。"}
+        msg = await complete_chat(tier, [{"role": "user", "content":
+            f"把下面联网搜到的资料整理成一条适合直接发到群里的简短消息（不超过 120 字，可带 1 条链接）：\n{results}"}],
+            system="你是羊皮纸助手，把资讯整理成可直接转发的简短群消息。", temperature=0.5)
+        msg = msg.strip()
+        if not msg:
+            return {"kind": "answer", "say": "我查到了，但没整理出合适的内容，要不直接说要发啥？"}
+        return {"kind": "send_message", "conversation_id": target["id"],
+                "conversation_title": target["title"], "content": msg,
+                "say": f"我查好了，准备发到【{target['title']}】："}
+
+    # 默认：直接回答（用搭子的口吻）
+    answer = await complete_chat(tier, [{"role": "user", "content": body.text}],
+                                 system=voice, temperature=0.9)
+    return {"kind": "answer", "say": answer.strip() or say or "嗯，我在听～"}
