@@ -24,7 +24,8 @@ def _post_dict(db: Session, p: Post, uid: int) -> dict:
             "author_initials": _initials(p.author_name),
             "author_avatar_url": author.avatar_url if author else None,
             "author_city": author.city if author else None, "content": p.content,
-            "image_url": p.image_url, "created_at": p.created_at.isoformat(),
+            "image_url": p.image_url, "location": p.location,
+            "created_at": p.created_at.isoformat(),
             "like_count": likes, "liked": liked, "comment_count": comments}
 
 
@@ -37,13 +38,15 @@ def feed(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
 class PostIn(BaseModel):
     content: str = Field(default="", max_length=1000)
     image_url: str | None = None
+    location: str | None = Field(default=None, max_length=40)
 
 
 @router.post("/moments")
 def create_post(body: PostIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if not body.content.strip() and not body.image_url:
         raise HTTPException(status_code=400, detail="内容不能为空")
-    p = Post(author_id=user.id, author_name=user.nickname, content=body.content, image_url=body.image_url)
+    p = Post(author_id=user.id, author_name=user.nickname, content=body.content,
+             image_url=body.image_url, location=(body.location or None))
     db.add(p); db.commit(); db.refresh(p)
     return _post_dict(db, p, user.id)
 

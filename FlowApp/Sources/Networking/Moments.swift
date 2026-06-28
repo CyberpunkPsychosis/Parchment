@@ -9,6 +9,7 @@ struct MomentPost: Codable, Identifiable, Hashable {
     var author_city: String?
     let content: String
     let image_url: String?
+    var location: String?
     let created_at: String
     var like_count: Int
     var liked: Bool

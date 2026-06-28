@@ -45,6 +45,7 @@ def _migrate():
         _ensure("conversations", {"avatar": "VARCHAR", "member_cap": "INTEGER", "announcement": "VARCHAR"})
         _ensure("conversation_members", {"pinned": "BOOLEAN", "muted": "BOOLEAN"})
         _ensure("users", {"is_seed": "BOOLEAN", "is_admin": "BOOLEAN", "city": "VARCHAR"})
+        _ensure("posts", {"location": "VARCHAR"})
         conn.commit()
 
 

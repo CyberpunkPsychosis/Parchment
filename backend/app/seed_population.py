@@ -76,7 +76,8 @@ _COMMENTS = [
     "哈哈哈哈太真实了", "下次带上我", "学到了", "保重身体呀", "同款心情",
     "好有氛围感", "看饿了", "加油！", "美美哒", "想去想去",
 ]
-_GENDER_FOR_NAME = {}  # 占位：头像随机，不强行匹配性别
+_CITIES = ["北京", "上海", "深圳", "广州", "成都", "杭州", "武汉", "西安",
+           "重庆", "南京", "长沙", "苏州", "天津", "青岛", "厦门", "昆明"]
 
 
 def _make_email() -> str:
@@ -84,8 +85,9 @@ def _make_email() -> str:
 
 
 def create_fake_user(db: Session, nickname: str | None = None, bio: str | None = None,
-                     avatar_url: str | None = None, idx: int | None = None) -> User:
-    """建一个假用户（is_seed=True）。无头像则从素材池取。"""
+                     avatar_url: str | None = None, city: str | None = None,
+                     idx: int | None = None) -> User:
+    """建一个假用户（is_seed=True）。头像默认留空（由运营自行设置），城市均匀轮转分配。"""
     if idx is None:
         idx = random.randint(0, 9999)
     u = User(
@@ -93,7 +95,8 @@ def create_fake_user(db: Session, nickname: str | None = None, bio: str | None =
         password_hash=hash_password(uuid.uuid4().hex),  # 随机密码，无人登录
         nickname=nickname or random.choice(_NICKNAMES),
         bio=bio if bio is not None else random.choice(_BIOS),
-        avatar_url=avatar_url or seed_assets.pick_avatar(idx),
+        avatar_url=avatar_url or None,           # 不自动生成头像，运营后台再设
+        city=city or _CITIES[idx % len(_CITIES)],   # 城市均匀分布
         is_seed=True,
     )
     db.add(u)
@@ -103,9 +106,11 @@ def create_fake_user(db: Session, nickname: str | None = None, bio: str | None =
 
 
 def post_moment_as(db: Session, author: User, content: str,
-                   image_url: str | None = None, created_at: datetime | None = None) -> Post:
+                   image_url: str | None = None, created_at: datetime | None = None,
+                   location: str | None = None) -> Post:
     p = Post(author_id=author.id, author_name=author.nickname,
              content=content, image_url=image_url,
+             location=location if location is not None else author.city,  # 默认标作者城市
              created_at=created_at or datetime.utcnow())
     db.add(p)
     db.commit()
@@ -121,19 +126,18 @@ def seed_initial_population(db: Session, users: int = 20, moments: int = 50) -> 
     """首次建一批假用户 + 错峰朋友圈（仅当还没有假用户时）。"""
     if db.query(User).filter(User.is_seed == True).first():  # noqa: E712
         return {"skipped": True}
-    if not seed_assets.has_assets():
-        return {"skipped": True, "reason": "no seed assets"}
     made_users = [create_fake_user(db, idx=i) for i in range(users)]
     now = datetime.utcnow()
-    texts = random.sample(_MOMENTS * 3, min(moments, len(_MOMENTS) * 3))
+    # 文案洗牌轮转，尽量不重复
+    bank = _MOMENTS[:]; random.shuffle(bank)
     posts = []
     for i in range(moments):
         author = random.choice(made_users)
         # 近 ~20 天内错峰
         ts = now - timedelta(days=random.randint(0, 20), hours=random.randint(0, 23),
                              minutes=random.randint(0, 59))
-        img = seed_assets.pick_moment(i) if random.random() < 0.6 else None
-        posts.append(post_moment_as(db, author, texts[i % len(texts)], img, ts))
+        # 配图留空（由运营在后台设置）；地点默认作者城市
+        posts.append(post_moment_as(db, author, bank[i % len(bank)], None, ts))
     _add_likes_and_comments(db, made_users, posts)
     print(f"[seed] 首批注入假用户 {len(made_users)} 位、朋友圈 {len(posts)} 条")
     return {"users": len(made_users), "moments": len(posts)}
@@ -167,8 +171,7 @@ def generate_users(db: Session, count: int) -> list[User]:
     base = db.query(User).filter(User.is_seed == True).count()  # noqa: E712
     for k in range(count):
         u = create_fake_user(db, idx=base + k)
-        img = seed_assets.pick_moment(base + k) if random.random() < 0.6 else None
-        post_moment_as(db, u, random.choice(_MOMENTS), img)
+        post_moment_as(db, u, random.choice(_MOMENTS), None)   # 配图留空，运营后台再设
         out.append(u)
     return out
 
@@ -190,8 +193,7 @@ def daily_tick(db: Session, n_users: int, n_moments: int, force: bool = False) -
         if not pool:
             break
         author = random.choice(pool)
-        img = seed_assets.pick_moment(random.randint(0, 999)) if random.random() < 0.6 else None
-        posts.append(post_moment_as(db, author, random.choice(_MOMENTS), img))
+        posts.append(post_moment_as(db, author, random.choice(_MOMENTS), None))
     _add_likes_and_comments(db, pool, posts)
 
     if st:

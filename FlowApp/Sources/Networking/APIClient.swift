@@ -28,9 +28,18 @@ struct AdminFakeUser: Decodable, Identifiable, Hashable {
     let nickname: String
     var bio: String?
     var avatar_url: String?
+    var city: String?
     let post_count: Int
     let companion_count: Int
     let group_count: Int
+}
+
+struct AdminMoment: Decodable, Identifiable, Hashable {
+    let id: Int
+    var content: String
+    var image_url: String?
+    var location: String?
+    let created_at: String
 }
 
 struct Sticker: Codable, Identifiable, Hashable {
@@ -419,10 +428,27 @@ final class APIClient {
         let req = try makeRequest("/admin/fake-users/generate", method: "POST", body: ["count": count])
         _ = try await URLSession.shared.data(for: req)
     }
-    func adminPostMoment(uid: Int, content: String, imageURL: String?) async throws {
-        struct B: Encodable { let content: String; let image_url: String? }
-        let req = try makeRequest("/admin/fake-users/\(uid)/moments", method: "POST", body: B(content: content, image_url: imageURL))
+    func adminPostMoment(uid: Int, content: String, imageURL: String?, location: String? = nil) async throws {
+        struct B: Encodable { let content: String; let image_url: String?; let location: String? }
+        let req = try makeRequest("/admin/fake-users/\(uid)/moments", method: "POST", body: B(content: content, image_url: imageURL, location: location))
         _ = try await send(req, as: EmptyResponse.self)
+    }
+    func adminUpdateFakeUser(uid: Int, nickname: String?, bio: String?, city: String?, avatarURL: String?) async throws -> AdminFakeUser {
+        struct B: Encodable { let nickname: String?; let bio: String?; let city: String?; let avatar_url: String? }
+        let req = try makeRequest("/admin/fake-users/\(uid)", method: "PATCH", body: B(nickname: nickname, bio: bio, city: city, avatar_url: avatarURL))
+        return try await send(req, as: AdminFakeUser.self)
+    }
+    func adminUserMoments(uid: Int) async throws -> [AdminMoment] {
+        struct R: Decodable { let moments: [AdminMoment] }
+        return try await send(try makeRequest("/admin/fake-users/\(uid)/moments", method: "GET"), as: R.self).moments
+    }
+    func adminUpdateMoment(pid: Int, content: String?, imageURL: String?, location: String?) async throws {
+        struct B: Encodable { let content: String?; let image_url: String?; let location: String? }
+        let req = try makeRequest("/admin/moments/\(pid)", method: "PATCH", body: B(content: content, image_url: imageURL, location: location))
+        _ = try await send(req, as: EmptyResponse.self)
+    }
+    func adminDeleteMoment(pid: Int) async throws {
+        _ = try await URLSession.shared.data(for: try makeRequest("/admin/moments/\(pid)", method: "DELETE"))
     }
     func adminMakeCompanion(uid: Int, name: String, persona: String, greeting: String, tint: String) async throws {
         struct B: Encodable { let name: String; let persona: String; let greeting: String; let tint: String }
@@ -677,9 +703,9 @@ final class APIClient {
         return try await send(req, as: R.self).posts
     }
 
-    func createPost(content: String, imageURL: String? = nil) async throws -> MomentPost {
-        struct B: Encodable { let content: String; let image_url: String? }
-        let req = try makeRequest("/moments", method: "POST", body: B(content: content, image_url: imageURL))
+    func createPost(content: String, imageURL: String? = nil, location: String? = nil) async throws -> MomentPost {
+        struct B: Encodable { let content: String; let image_url: String?; let location: String? }
+        let req = try makeRequest("/moments", method: "POST", body: B(content: content, image_url: imageURL, location: location))
         return try await send(req, as: MomentPost.self)
     }
 

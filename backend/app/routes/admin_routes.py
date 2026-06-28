@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from ..deps import get_admin_user
 from ..db import get_db
-from ..models import User, Post, Companion, Group, GroupMember
+from ..models import User, Post, PostLike, PostComment, Companion, Group, GroupMember
 from ..config import SEED_DAILY_USERS, SEED_DAILY_MOMENTS
 from .. import seed_population as sp
 from .. import seed_assets
@@ -18,6 +18,7 @@ def _fake_user_dict(db: Session, u: User) -> dict:
     comps = db.query(Companion).filter(Companion.owner_id == u.id).count()
     groups = db.query(Group).filter(Group.owner_id == u.id).count()
     return {"id": u.id, "nickname": u.nickname, "bio": u.bio, "avatar_url": u.avatar_url,
+            "city": u.city,
             "post_count": posts, "companion_count": comps, "group_count": groups}
 
 
@@ -67,9 +68,44 @@ def _seed_user_or_404(db: Session, uid: int) -> User:
     return u
 
 
+class FakeUserPatch(BaseModel):
+    nickname: str | None = Field(default=None, max_length=40)
+    bio: str | None = Field(default=None, max_length=200)
+    city: str | None = Field(default=None, max_length=20)
+    avatar_url: str | None = None      # 传空字符串清除
+
+
+@router.patch("/admin/fake-users/{uid}")
+def edit_fake_user(uid: int, body: FakeUserPatch, admin: User = Depends(get_admin_user), db: Session = Depends(get_db)):
+    u = _seed_user_or_404(db, uid)
+    if body.nickname is not None and body.nickname.strip():
+        u.nickname = body.nickname.strip()
+    if body.bio is not None:
+        u.bio = body.bio
+    if body.city is not None:
+        u.city = body.city.strip() or None
+    if body.avatar_url is not None:
+        u.avatar_url = body.avatar_url or None
+    db.commit()
+    return _fake_user_dict(db, u)
+
+
+def _moment_dict(p: Post) -> dict:
+    return {"id": p.id, "content": p.content, "image_url": p.image_url,
+            "location": p.location, "created_at": p.created_at.isoformat()}
+
+
+@router.get("/admin/fake-users/{uid}/moments")
+def list_user_moments(uid: int, admin: User = Depends(get_admin_user), db: Session = Depends(get_db)):
+    _seed_user_or_404(db, uid)
+    rows = db.query(Post).filter(Post.author_id == uid).order_by(Post.created_at.desc()).all()
+    return {"moments": [_moment_dict(p) for p in rows]}
+
+
 class MomentIn(BaseModel):
     content: str = Field(default="", max_length=1000)
     image_url: str | None = None
+    location: str | None = Field(default=None, max_length=40)
 
 
 @router.post("/admin/fake-users/{uid}/moments")
@@ -77,8 +113,47 @@ def post_moment(uid: int, body: MomentIn, admin: User = Depends(get_admin_user),
     u = _seed_user_or_404(db, uid)
     if not body.content.strip() and not body.image_url:
         raise HTTPException(status_code=400, detail="内容不能为空")
-    p = sp.post_moment_as(db, u, body.content, body.image_url)
-    return {"id": p.id, "author_name": p.author_name, "content": p.content, "image_url": p.image_url}
+    p = sp.post_moment_as(db, u, body.content, body.image_url, location=body.location)
+    return _moment_dict(p)
+
+
+class MomentPatch(BaseModel):
+    content: str | None = Field(default=None, max_length=1000)
+    image_url: str | None = None       # 传空字符串清除配图
+    location: str | None = Field(default=None, max_length=40)
+
+
+def _seed_post_or_404(db: Session, pid: int) -> Post:
+    p = db.query(Post).filter(Post.id == pid).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="动态不存在")
+    author = db.query(User).filter(User.id == p.author_id).first()
+    if not author or not author.is_seed:
+        raise HTTPException(status_code=403, detail="只能改假用户的动态")
+    return p
+
+
+@router.patch("/admin/moments/{pid}")
+def edit_moment(pid: int, body: MomentPatch, admin: User = Depends(get_admin_user), db: Session = Depends(get_db)):
+    p = _seed_post_or_404(db, pid)
+    if body.content is not None:
+        p.content = body.content
+    if body.image_url is not None:
+        p.image_url = body.image_url or None
+    if body.location is not None:
+        p.location = body.location.strip() or None
+    db.commit()
+    return _moment_dict(p)
+
+
+@router.delete("/admin/moments/{pid}")
+def delete_moment(pid: int, admin: User = Depends(get_admin_user), db: Session = Depends(get_db)):
+    p = _seed_post_or_404(db, pid)
+    db.query(PostLike).filter(PostLike.post_id == pid).delete()
+    db.query(PostComment).filter(PostComment.post_id == pid).delete()
+    db.delete(p)
+    db.commit()
+    return {"ok": True}
 
 
 class CompanionIn(BaseModel):

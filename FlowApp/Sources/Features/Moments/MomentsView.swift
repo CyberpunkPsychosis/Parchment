@@ -10,6 +10,7 @@ struct MomentsView: View {
     @State private var expanded: Set<Int> = []
     @State private var commentCache: [Int: [MomentComment]] = [:]
     @State private var drafts: [Int: String] = [:]
+    @State private var profileRef: UserRef?
 
     var body: some View {
         ScrollView {
@@ -37,6 +38,7 @@ struct MomentsView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task { await reload() }
+        .sheet(item: $profileRef) { ref in UserProfileView(userId: ref.id) }
         .sheet(isPresented: $showCompose) { ComposeMomentView { Task { await reload() } } }
         .onReceive(NotificationCenter.default.publisher(for: .flowMomentsChanged)) { _ in
             Task { await reload() }
@@ -46,22 +48,27 @@ struct MomentsView: View {
     private func postCard(_ p: MomentPost, seed: UInt64) -> some View {
         Card(seed: seed) {
             VStack(alignment: .leading, spacing: 10) {
-                // 头部 + 正文 + 配图：点进详情页（微信式）
-                NavigationLink(value: p) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack(spacing: 11) {
-                            Avatar(initials: p.author_initials, tint: FlowTheme.tint(["teal","sage","tealDark","ink","gray"][p.author_id % 5]), size: 40, seed: seed, imageURL: p.author_avatar_url)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(p.author_name).font(.system(size: 15, weight: .semibold)).foregroundStyle(FlowTheme.ink)
-                                HStack(spacing: 6) {
-                                    Text(p.displayTime).font(FlowTheme.caption(11)).foregroundStyle(FlowTheme.gray)
-                                    if let c = p.author_city, !c.isEmpty {
-                                        Text("· \(c)").font(FlowTheme.caption(11)).foregroundStyle(FlowTheme.gray)
-                                    }
+                // 头部：点头像/昵称看个人资料
+                Button { profileRef = UserRef(id: p.author_id) } label: {
+                    HStack(spacing: 11) {
+                        Avatar(initials: p.author_initials, tint: FlowTheme.tint(["teal","sage","tealDark","ink","gray"][p.author_id % 5]), size: 40, seed: seed, imageURL: p.author_avatar_url)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(p.author_name).font(.system(size: 15, weight: .semibold)).foregroundStyle(FlowTheme.ink)
+                            HStack(spacing: 6) {
+                                Text(p.displayTime).font(FlowTheme.caption(11)).foregroundStyle(FlowTheme.gray)
+                                if let c = p.author_city, !c.isEmpty {
+                                    Text("· \(c)").font(FlowTheme.caption(11)).foregroundStyle(FlowTheme.gray)
                                 }
                             }
-                            Spacer()
                         }
+                        Spacer()
+                    }
+                }
+                .buttonStyle(.plain)
+
+                // 正文 + 配图 + 地点：点进详情页（微信式）
+                NavigationLink(value: p) {
+                    VStack(alignment: .leading, spacing: 10) {
                         if !p.content.isEmpty {
                             Text(p.content).font(FlowTheme.body(15)).foregroundStyle(FlowTheme.ink)
                                 .multilineTextAlignment(.leading)
@@ -71,7 +78,14 @@ struct MomentsView: View {
                             AsyncImage(url: u) { img in img.resizable().scaledToFill() } placeholder: { FlowTheme.beige }
                                 .frame(height: 160).frame(maxWidth: .infinity).clipShape(RoundedRectangle(cornerRadius: 12))
                         }
+                        if let locn = p.location, !locn.isEmpty {
+                            HStack(spacing: 3) {
+                                Image(systemName: "mappin.and.ellipse").font(.system(size: 10))
+                                Text(locn).font(FlowTheme.caption(11))
+                            }.foregroundStyle(FlowTheme.teal.opacity(0.85))
+                        }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .buttonStyle(.plain)
 
@@ -173,6 +187,7 @@ struct ComposeMomentView: View {
     @Environment(\.dismiss) private var dismiss
     var onPosted: () -> Void = {}
     @State private var text = ""
+    @State private var location = ""
     @State private var photoItem: PhotosPickerItem?
     @State private var imageURL: String?
     @State private var uploading = false
@@ -218,6 +233,12 @@ struct ComposeMomentView: View {
                 }
                 Spacer()
             }
+            HStack(spacing: 6) {
+                Image(systemName: "mappin.and.ellipse").foregroundStyle(FlowTheme.gray)
+                TextField(loc.t("moments.location"), text: $location).font(FlowTheme.caption(14))
+            }
+            .padding(.horizontal, 12).padding(.vertical, 9)
+            .background(RoundedRectangle(cornerRadius: 12).fill(FlowTheme.field)).sketchBorder(12, width: 1.1, seed: 93)
         }
         .padding(20).background(PaperBackground())
         .onChange(of: photoItem) { _, item in
@@ -251,7 +272,8 @@ struct ComposeMomentView: View {
         guard !t.isEmpty || imageURL != nil, !posting else { return }
         posting = true
         Task {
-            _ = try? await APIClient.shared.createPost(content: t, imageURL: imageURL)
+            let loca = location.trimmingCharacters(in: .whitespaces)
+            _ = try? await APIClient.shared.createPost(content: t, imageURL: imageURL, location: loca.isEmpty ? nil : loca)
             onPosted()
             await MainActor.run { posting = false; dismiss() }
         }
@@ -295,6 +317,12 @@ struct PostDetailView: View {
                     if let url = current.image_url, let u = URL(string: url) {
                         AsyncImage(url: u) { img in img.resizable().scaledToFill() } placeholder: { FlowTheme.beige }
                             .frame(maxWidth: .infinity).frame(height: 200).clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    if let locn = current.location, !locn.isEmpty {
+                        HStack(spacing: 3) {
+                            Image(systemName: "mappin.and.ellipse").font(.system(size: 11))
+                            Text(locn).font(FlowTheme.caption(12))
+                        }.foregroundStyle(FlowTheme.teal.opacity(0.85))
                     }
                     HStack(spacing: 5) {
                         Button { like() } label: {

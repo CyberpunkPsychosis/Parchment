@@ -333,6 +333,7 @@ class Post(Base):
     author_name = Column(String, nullable=False, default="")
     content = Column(String, nullable=False, default="")
     image_url = Column(String, nullable=True)
+    location = Column(String, nullable=True)     # 朋友圈地点标签
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
