@@ -11,6 +11,8 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
     nickname = Column(String, nullable=False, default="")
+    avatar_url = Column(String, nullable=True)   # 真实头像（无则前端用首字母）
+    bio = Column(String, nullable=True)          # 个性签名
     tier = Column(String, nullable=False, default="free")  # "free" | "pro"
     tier_expiry = Column(DateTime, nullable=True)
     auto_send_stickers = Column(Boolean, nullable=True)  # None=未选择(首次询问), True/False=已记住偏好
@@ -30,6 +32,8 @@ class User(Base):
             "id": self.id,
             "email": self.email,
             "nickname": self.nickname,
+            "avatar_url": self.avatar_url,
+            "bio": self.bio,
             "tier": "pro" if self.is_pro else "free",
             "tier_expiry": self.tier_expiry.isoformat() if self.tier_expiry else None,
             "auto_send_stickers": self.auto_send_stickers,  # null=首次未选
@@ -209,6 +213,9 @@ class Conversation(Base):
     type = Column(String, nullable=False, default="direct")  # direct | group | companion
     group_id = Column(Integer, nullable=True, index=True)    # type=group 时关联 groups.id
     title = Column(String, nullable=False, default="")       # 可选缓存标题
+    avatar = Column(String, nullable=True)                   # 好友群头像
+    member_cap = Column(Integer, nullable=True)              # 好友群人数上限（None=用默认）
+    announcement = Column(String, nullable=True)             # 群公告
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow)  # 末条消息时间，用于排序
 
@@ -223,6 +230,8 @@ class ConversationMember(Base):
     companion_id = Column(Integer, index=True, nullable=True)   # AI 搭子成员（阶段 4）
     role = Column(String, nullable=False, default="member")     # owner | member
     last_read_at = Column(DateTime, nullable=True)              # 已读水位（算未读）
+    pinned = Column(Boolean, nullable=True)                     # 置顶
+    muted = Column(Boolean, nullable=True)                      # 免打扰
     joined_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
@@ -237,6 +246,16 @@ class Message(Base):
     kind = Column(String, nullable=False, default="text")  # text|image|sticker|file|voice|system|companion
     content = Column(String, nullable=False, default="")   # 文本 / URL / JSON
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class MessageReaction(Base):
+    __tablename__ = "message_reactions"
+    __table_args__ = (UniqueConstraint("message_id", "user_id", "emoji", name="uq_msg_react"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    message_id = Column(Integer, index=True, nullable=False)
+    user_id = Column(Integer, index=True, nullable=False)
+    emoji = Column(String, nullable=False)
 
 
 class Post(Base):

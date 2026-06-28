@@ -58,6 +58,8 @@ def me(user: User = Depends(get_current_user)):
 class SettingsIn(BaseModel):
     auto_send_stickers: bool | None = None
     nickname: str | None = Field(default=None, max_length=40)
+    avatar_url: str | None = None
+    bio: str | None = Field(default=None, max_length=200)
 
 
 @router.patch("/me/settings")
@@ -68,6 +70,10 @@ def update_settings(body: SettingsIn,
         user.auto_send_stickers = body.auto_send_stickers
     if body.nickname is not None and body.nickname.strip():
         user.nickname = body.nickname.strip()
+    if body.avatar_url is not None:
+        user.avatar_url = body.avatar_url or None
+    if body.bio is not None:
+        user.bio = body.bio
     db.commit()
     db.refresh(user)
     return user.public_dict()

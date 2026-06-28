@@ -29,6 +29,17 @@ def _migrate():
             conn.execute(text("ALTER TABLE memories ADD COLUMN origin VARCHAR"))
         if "origin" not in [r[1] for r in conn.execute(text("PRAGMA table_info(snapshot_memories)"))]:
             conn.execute(text("ALTER TABLE snapshot_memories ADD COLUMN origin VARCHAR"))
+
+        def _ensure(table: str, cols: dict):
+            existing = [r[1] for r in conn.execute(text(f"PRAGMA table_info({table})"))]
+            for name, decl in cols.items():
+                if name not in existing:
+                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {decl}"))
+
+        # 体验完善新增列（表存在时才补；新表由 create_all 建）
+        _ensure("users", {"avatar_url": "VARCHAR", "bio": "VARCHAR"})
+        _ensure("conversations", {"avatar": "VARCHAR", "member_cap": "INTEGER", "announcement": "VARCHAR"})
+        _ensure("conversation_members", {"pinned": "BOOLEAN", "muted": "BOOLEAN"})
         conn.commit()
 
 

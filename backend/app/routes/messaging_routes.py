@@ -88,6 +88,7 @@ def serialize_message(db: Session, m: Message) -> dict:
                 "content": m.content, "created_at": m.created_at.isoformat(),
                 "sender_user_id": None, "companion_id": m.sender_companion_id,
                 "sender_name": name, "sender_avatar": c.avatar if c else "AI",
+                "sender_avatar_url": None,
                 "sender_tint": c.tint if c else "teal", "is_ai": True}
     u = db.query(User).filter(User.id == m.sender_user_id).first() if m.sender_user_id else None
     name = u.nickname if u else "用户"
@@ -95,6 +96,7 @@ def serialize_message(db: Session, m: Message) -> dict:
             "content": m.content, "created_at": m.created_at.isoformat(),
             "sender_user_id": m.sender_user_id, "companion_id": None,
             "sender_name": name, "sender_avatar": _initials(name),
+            "sender_avatar_url": u.avatar_url if u else None,
             "sender_tint": _tint_for(m.sender_user_id or 0), "is_ai": False}
 
 
@@ -105,10 +107,14 @@ def conv_dict(db: Session, conv: Conversation, uid: int) -> dict:
     last = (db.query(Message).filter(Message.conversation_id == conv.id)
             .order_by(Message.created_at.desc()).first())
 
+    avatar_url = None
     if conv.type == "group":
-        g = db.query(Group).filter(Group.id == conv.group_id).first()
-        title = g.name if g else (conv.title or "群聊")
-        avatar = g.avatar if g else "群"; tint = g.tint if g else "teal"
+        g = db.query(Group).filter(Group.id == conv.group_id).first() if conv.group_id else None
+        if g:  # 社群
+            title = g.name; avatar = g.avatar; tint = g.tint
+        else:  # 好友群
+            title = conv.title or "群聊"; avatar = _initials(title); tint = "teal"
+            avatar_url = conv.avatar
     elif conv.type == "companion":
         cm = next((m for m in members if m.companion_id), None)
         c = db.query(Companion).filter(Companion.id == cm.companion_id).first() if cm else None
@@ -118,6 +124,7 @@ def conv_dict(db: Session, conv: Conversation, uid: int) -> dict:
         u = db.query(User).filter(User.id == other.user_id).first() if other else None
         title = u.nickname if u else "对话"; avatar = _initials(title)
         tint = _tint_for(other.user_id if other else 0)
+        avatar_url = u.avatar_url if u else None
 
     # 未读
     me = next((m for m in members if m.user_id == uid), None)
@@ -141,12 +148,16 @@ def conv_dict(db: Session, conv: Conversation, uid: int) -> dict:
         preview = "[文件]"
 
     return {"id": conv.id, "type": conv.type, "group_id": conv.group_id,
-            "title": title, "avatar": avatar, "tint": tint,
+            "title": title, "avatar": avatar, "avatar_url": avatar_url, "tint": tint,
             "is_group": conv.type == "group",
             "member_count": len(human),
+            "member_cap": conv.member_cap,
+            "announcement": conv.announcement,
             "preview": preview,
             "time": (last.created_at if last else conv.updated_at).isoformat(),
-            "unread": unread}
+            "unread": unread,
+            "pinned": bool(me.pinned) if me else False,
+            "muted": bool(me.muted) if me else False}
 
 
 # ---------- WebSocket 实时投递 ----------
@@ -315,7 +326,8 @@ def conversation_members(cid: int, user: User = Depends(get_current_user), db: S
             u = db.query(User).filter(User.id == m.user_id).first()
             name = u.nickname if u else "用户"
             out.append({"is_ai": False, "user_id": m.user_id, "name": name, "role": m.role,
-                        "initials": _initials(name), "tint": _tint_for(m.user_id)})
+                        "initials": _initials(name), "tint": _tint_for(m.user_id),
+                        "avatar_url": u.avatar_url if u else None})
     return {"members": out}
 
 
