@@ -411,6 +411,13 @@ final class APIClient {
         return try await send(req, as: MessageDTO.self)
     }
 
+    @discardableResult
+    func updateConversation(_ cid: Int, title: String? = nil, avatar: String? = nil, announcement: String? = nil) async throws -> ConversationDTO {
+        struct B: Encodable { let title: String?; let avatar: String?; let announcement: String? }
+        let req = try makeRequest("/conversations/\(cid)", method: "PATCH", body: B(title: title, avatar: avatar, announcement: announcement))
+        return try await send(req, as: ConversationDTO.self)
+    }
+
     func leaveConversation(_ cid: Int) async throws {
         let req = try makeRequest("/conversations/\(cid)/leave", method: "POST")
         _ = try await URLSession.shared.data(for: req)

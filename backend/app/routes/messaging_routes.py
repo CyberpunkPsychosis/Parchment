@@ -485,6 +485,31 @@ def _my_role(db: Session, cid: int, uid: int) -> str | None:
     return m.role if m else None
 
 
+class ConvPatch(BaseModel):
+    title: str | None = None
+    avatar: str | None = None
+    announcement: str | None = None
+
+
+@router.patch("/conversations/{cid}")
+def patch_conversation(cid: int, body: ConvPatch,
+                       user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    conv = db.query(Conversation).filter(Conversation.id == cid).first()
+    if not conv or _my_role(db, cid, user.id) != "owner":
+        raise HTTPException(status_code=403, detail="仅群主可编辑")
+    if body.title is not None and body.title.strip():
+        conv.title = body.title.strip()
+    if body.avatar is not None:
+        conv.avatar = body.avatar or None
+    if body.announcement is not None:
+        conv.announcement = body.announcement
+        if body.announcement.strip():  # 公告作为系统消息广播
+            db.add(Message(conversation_id=cid, sender_user_id=user.id,
+                           kind="system", content=f"📢 {body.announcement.strip()}"))
+    db.commit()
+    return conv_dict(db, conv, user.id)
+
+
 @router.post("/conversations/{cid}/leave")
 def leave_conversation(cid: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     m = db.query(ConversationMember).filter(

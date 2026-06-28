@@ -231,6 +231,13 @@ struct ConversationView: View {
 
     private var inputBar: some View {
         HStack(spacing: 10) {
+            if conversation.is_group {
+                Menu {
+                    ForEach(members.filter { !$0.is_ai && $0.user_id != myId }) { m in
+                        Button(m.name) { draft += "@\(m.name) " }
+                    }
+                } label: { Image(systemName: "at").font(.system(size: 18)).foregroundStyle(FlowTheme.gray) }
+            }
             PhotosPicker(selection: $photoItem, matching: .images) {
                 Image(systemName: "photo").font(.system(size: 20)).foregroundStyle(FlowTheme.gray)
             }
@@ -411,6 +418,9 @@ struct GroupMembersView: View {
     var onLeave: () -> Void = {}
 
     @State private var members: [ConvMemberDTO] = []
+    @State private var showEdit = false
+    @State private var showInvite = false
+    @State private var announcement = ""
 
     private var amOwner: Bool { members.first { $0.user_id == myId }?.role == "owner" }
     private var countSuffix: String {
@@ -426,6 +436,31 @@ struct GroupMembersView: View {
                 Spacer()
                 Button { dismiss() } label: { Image(systemName: "xmark").foregroundStyle(FlowTheme.gray) }
             }.padding(20)
+
+            if !announcement.isEmpty {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "megaphone").foregroundStyle(FlowTheme.teal).font(.system(size: 13))
+                    Text(announcement).font(FlowTheme.caption(13)).foregroundStyle(FlowTheme.ink)
+                    Spacer()
+                }
+                .padding(.horizontal, 14).padding(.vertical, 10)
+                .sketchCard(14, fill: FlowTheme.teal.opacity(0.08), seed: 77)
+                .padding(.horizontal, 20).padding(.bottom, 10)
+            }
+
+            if amOwner {
+                HStack(spacing: 10) {
+                    Button { showEdit = true } label: {
+                        Label(loc.t("group.edit"), systemImage: "square.and.pencil").font(FlowTheme.caption(13))
+                    }
+                    Button { showInvite = true } label: {
+                        Label(loc.t("group.invite"), systemImage: "person.badge.plus").font(FlowTheme.caption(13))
+                    }
+                    Spacer()
+                }
+                .foregroundStyle(FlowTheme.teal)
+                .padding(.horizontal, 20).padding(.bottom, 8)
+            }
 
             ScrollView {
                 VStack(spacing: 10) {
@@ -459,7 +494,13 @@ struct GroupMembersView: View {
             }.padding(20)
         }
         .background(PaperBackground())
-        .task { members = (try? await APIClient.shared.conversationMembers(conversation.id)) ?? [] }
+        .task { announcement = conversation.announcement ?? ""; await reload() }
+        .sheet(isPresented: $showEdit) { GroupEditView(conversation: conversation) { c in announcement = c.announcement ?? "" } }
+        .sheet(isPresented: $showInvite) { InviteFriendsView(conversation: conversation, existing: Set(members.compactMap { $0.user_id })) { Task { await reload() } } }
+    }
+
+    private func reload() async {
+        members = (try? await APIClient.shared.conversationMembers(conversation.id)) ?? []
     }
 
     private func remove(_ m: ConvMemberDTO) {
@@ -472,6 +513,124 @@ struct GroupMembersView: View {
         Task {
             try? await APIClient.shared.leaveConversation(conversation.id)
             await MainActor.run { dismiss(); onLeave() }
+        }
+    }
+}
+
+/// 群主编辑群信息：群名 / 头像 / 公告。
+struct GroupEditView: View {
+    @EnvironmentObject var loc: Localization
+    @Environment(\.dismiss) private var dismiss
+    let conversation: ConversationDTO
+    var onSaved: (ConversationDTO) -> Void = { _ in }
+
+    @State private var title = ""
+    @State private var announcement = ""
+    @State private var avatarURL: String?
+    @State private var photoItem: PhotosPickerItem?
+    @State private var uploading = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Button { dismiss() } label: { Text(loc.t("common.cancel")).foregroundStyle(FlowTheme.gray) }
+                Spacer()
+                Text(loc.t("group.edit")).font(FlowTheme.heading(18)).foregroundStyle(FlowTheme.ink)
+                Spacer()
+                Button { save() } label: { Text(loc.t("profile.save")).fontWeight(.semibold).foregroundStyle(FlowTheme.teal) }
+            }.padding(20)
+
+            ScrollView {
+                VStack(spacing: 18) {
+                    PhotosPicker(selection: $photoItem, matching: .images) {
+                        Avatar(initials: title.isEmpty ? "群" : String(title.prefix(1)), tint: FlowTheme.teal, size: 84, seed: 7, imageURL: avatarURL)
+                            .overlay(alignment: .bottomTrailing) {
+                                Image(systemName: uploading ? "arrow.triangle.2.circlepath" : "camera.fill")
+                                    .font(.system(size: 12)).foregroundStyle(.white).padding(6).background(Circle().fill(FlowTheme.teal))
+                            }
+                    }.padding(.top, 8)
+                    field(loc.t("groups.name"), text: $title, seed: 33)
+                    field(loc.t("group.announcement"), text: $announcement, seed: 34)
+                }.padding(.horizontal, 20)
+            }
+        }
+        .background(PaperBackground())
+        .onAppear { title = conversation.title; announcement = conversation.announcement ?? ""; avatarURL = conversation.avatar_url }
+        .onChange(of: photoItem) { _, item in
+            guard let item else { return }
+            uploading = true
+            Task {
+                if let data = try? await item.loadTransferable(type: Data.self),
+                   let url = try? await APIClient.shared.uploadImage(data) { await MainActor.run { avatarURL = url } }
+                await MainActor.run { uploading = false; photoItem = nil }
+            }
+        }
+    }
+
+    private func field(_ t: String, text: Binding<String>, seed: UInt64) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(t).font(FlowTheme.caption(13)).foregroundStyle(FlowTheme.gray)
+            TextField(t, text: text).font(FlowTheme.body(16))
+                .padding(.horizontal, 14).padding(.vertical, 12)
+                .background(RoundedRectangle(cornerRadius: 14).fill(FlowTheme.field)).sketchBorder(14, width: 1.3, seed: seed)
+        }
+    }
+
+    private func save() {
+        Task {
+            if let c = try? await APIClient.shared.updateConversation(conversation.id, title: title,
+                                                                      avatar: avatarURL ?? "", announcement: announcement) {
+                await MainActor.run { onSaved(c); dismiss() }
+            }
+        }
+    }
+}
+
+/// 邀请好友进群（排除已在群里的）。
+struct InviteFriendsView: View {
+    @EnvironmentObject var loc: Localization
+    @Environment(\.dismiss) private var dismiss
+    let conversation: ConversationDTO
+    let existing: Set<Int>
+    var onInvited: () -> Void = {}
+
+    @State private var friends: [FriendUser] = []
+    @State private var selected: Set<Int> = []
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text(loc.t("group.invite")).font(FlowTheme.heading(18)).foregroundStyle(FlowTheme.ink)
+                Spacer()
+                Button { dismiss() } label: { Image(systemName: "xmark").foregroundStyle(FlowTheme.gray) }
+            }.padding(20)
+            ScrollView {
+                VStack(spacing: 10) {
+                    ForEach(Array(friends.enumerated()), id: \.element.id) { idx, f in
+                        Button {
+                            if selected.contains(f.id) { selected.remove(f.id) } else { selected.insert(f.id) }
+                        } label: {
+                            HStack(spacing: 11) {
+                                Avatar(initials: f.initials, tint: f.tintColor, size: 38, seed: UInt64(idx + 230), imageURL: f.avatar_url)
+                                Text(f.nickname).font(.system(size: 15, weight: .semibold)).foregroundStyle(FlowTheme.ink)
+                                Spacer()
+                                CheckBox(checked: selected.contains(f.id))
+                            }
+                        }.buttonStyle(.plain)
+                    }
+                }.padding(20)
+            }
+            Button { invite() } label: { PrimaryButton(title: loc.t("groups.confirm")) }
+                .disabled(selected.isEmpty).opacity(selected.isEmpty ? 0.6 : 1).padding(20)
+        }
+        .background(PaperBackground())
+        .task { friends = ((try? await APIClient.shared.listFriends()) ?? []).filter { !existing.contains($0.id) } }
+    }
+
+    private func invite() {
+        Task {
+            for id in selected { try? await APIClient.shared.addUserToConversation(conversation.id, userId: id) }
+            await MainActor.run { onInvited(); dismiss() }
         }
     }
 }
