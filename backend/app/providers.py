@@ -10,6 +10,63 @@ import httpx
 from .config import pool_for, MAX_CONTEXT_MESSAGES
 
 
+def _partial_suffix_len(s: str, tag: str) -> int:
+    """s 结尾处与 tag 开头重叠的最长长度（用于跨分片识别半个标签）。"""
+    for k in range(min(len(s), len(tag) - 1), 0, -1):
+        if s.endswith(tag[:k]):
+            return k
+    return 0
+
+
+class _ThinkFilter:
+    """流式剥离 <think>...</think> 推理块。
+    MiniMax-M2、deepseek-reasoner 等推理模型会把思考过程内联进 content，
+    用户不该看到。逐 delta 喂入，跨分片的半个标签也能正确处理。"""
+    OPEN, CLOSE = "<think>", "</think>"
+
+    def __init__(self):
+        self.buf = ""
+        self.in_think = False
+        self.started = False  # 是否已吐出首个非空白字符（用于吃掉 </think> 后的前导空行）
+
+    def _emit(self, s: str) -> str:
+        if not self.started:
+            s = s.lstrip()
+            if s:
+                self.started = True
+        return s
+
+    def feed(self, delta: str) -> str:
+        self.buf += delta
+        out = ""
+        while self.buf:
+            if not self.in_think:
+                i = self.buf.find(self.OPEN)
+                if i != -1:
+                    out += self._emit(self.buf[:i])
+                    self.buf = self.buf[i + len(self.OPEN):]
+                    self.in_think = True
+                    continue
+                cut = _partial_suffix_len(self.buf, self.OPEN)
+                out += self._emit(self.buf[:len(self.buf) - cut])
+                self.buf = self.buf[len(self.buf) - cut:]
+                break
+            i = self.buf.find(self.CLOSE)
+            if i != -1:
+                self.buf = self.buf[i + len(self.CLOSE):]
+                self.in_think = False
+                continue
+            cut = _partial_suffix_len(self.buf, self.CLOSE)
+            self.buf = self.buf[len(self.buf) - cut:]
+            break
+        return out
+
+    def flush(self) -> str:
+        out = "" if self.in_think else self._emit(self.buf)
+        self.buf = ""
+        return out
+
+
 async def stream_chat_events(tier: str, messages: list[dict],
                              system: str | None = None,
                              temperature: float | None = None) -> AsyncGenerator[dict, None]:
@@ -40,19 +97,25 @@ async def stream_chat_events(tier: str, messages: list[dict],
                     # 拿到正常响应，开始产出
                     yield {"meta": {"model": cfg["model"], "provider": cfg["provider"],
                                     "tier": tier, "failover": idx > 0}}
+                    filt = _ThinkFilter()  # 剥离推理模型的 <think> 块
                     async for line in resp.aiter_lines():
                         if not line or not line.startswith("data:"):
                             continue
                         data = line[len("data:"):].strip()
                         if data == "[DONE]":
-                            return
+                            break
                         try:
                             obj = json.loads(data)
                             delta = obj["choices"][0]["delta"].get("content")
-                            if delta:
-                                yield {"delta": delta}
                         except (json.JSONDecodeError, KeyError, IndexError):
                             continue
+                        if delta:
+                            out = filt.feed(delta)
+                            if out:
+                                yield {"delta": out}
+                    tail = filt.flush()
+                    if tail:
+                        yield {"delta": tail}
                     return  # 正常结束
         except httpx.HTTPError:
             continue  # 连接层失败 → 试下一个
