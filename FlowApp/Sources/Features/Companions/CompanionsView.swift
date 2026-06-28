@@ -32,8 +32,11 @@ struct CompanionsView: View {
                                     Button { detailTarget = c } label: {
                                         Label(loc.t("growth.profile"), systemImage: "chart.line.uptrend.xyaxis")
                                     }
-                                    Button { editTarget = c } label: {
-                                        Label(loc.t("companion.edit"), systemImage: "pencil")
+                                    // 认领来的搭子：人设锁定，不提供编辑（保留惊喜感）
+                                    if !c.adopted {
+                                        Button { editTarget = c } label: {
+                                            Label(loc.t("companion.edit"), systemImage: "pencil")
+                                        }
                                     }
                                     Button { publishTarget = c } label: {
                                         Label(loc.t("publish.menu"), systemImage: "square.and.arrow.up")

@@ -215,9 +215,15 @@ async def _dispatch(db: Session, user: User, body: ActIn, hist: list[dict]) -> d
         posts = db.query(Post).order_by(Post.created_at.desc()).limit(50).all()
         if not posts:
             return {"kind": "answer", "say": "最近朋友圈还没什么动态可以分析～"}
-        lines = [f"{p.author_name}：{p.content or '[图片]'}" for p in posts]
+        # 按 user_id 归一身份：取当前昵称 + 附用户号，避免同一人因改名/快照被当成两个人
+        uids = {p.user_id for p in posts}
+        names = ({u.id: u.nickname for u in db.query(User).filter(User.id.in_(uids)).all()}
+                 if uids else {})
+        lines = [f"{names.get(p.user_id, p.author_name)}（用户#{p.user_id}）：{p.content or '[图片]'}"
+                 for p in posts]
         result = await complete_chat(tier, [{"role": "user", "content":
-            f"用户的要求：{body.text}\n\n下面是最近的朋友圈动态，请据此分析（点出具体是哪些人/哪些动态）：\n"
+            f"用户的要求：{body.text}\n\n下面是最近的朋友圈动态（括号里的“用户#N”是身份标识，N 相同就是同一个人，"
+            f"分析时务必按它归并，别把同一人当成多人；对外只说昵称、别显示用户#N）：\n"
             + "\n".join(lines)}], system="你是羊皮纸助手，帮用户分析朋友圈动态，简洁、点名到人。")
         return {"kind": "analyze", "say": result.strip() or (say or "我看完啦～")}
 

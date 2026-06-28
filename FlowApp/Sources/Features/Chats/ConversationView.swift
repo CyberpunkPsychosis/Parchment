@@ -40,6 +40,10 @@ struct ConversationView: View {
     private var companionId: Int? {
         conversation.type == "companion" ? aiMembers.first?.companion_id : nil
     }
+    /// 认领来的搭子：锁定记忆/人设（保留惊喜感）。
+    private var isAdoptedCompanion: Bool {
+        conversation.type == "companion" && (aiMembers.first?.adopted ?? false)
+    }
 
     /// 输入 @ 后的候选成员（含搭子），按当前查询前缀过滤。
     private var mentionCandidates: [ConvMemberDTO] {
@@ -346,9 +350,11 @@ struct ConversationView: View {
             Spacer()
             Menu {
                 if conversation.type == "companion" {
-                    // 搭子 1:1：给搭子专属菜单（查看记忆 / 编辑搭子），而非群组那套
-                    Button { showMemories = true } label: { Label(loc.t("memories.title"), systemImage: "brain.head.profile") }
-                    Button { openEditCompanion() } label: { Label(loc.t("companion.edit"), systemImage: "pencil") }
+                    // 搭子 1:1：给搭子专属菜单。认领来的搭子锁定记忆/人设（保留惊喜感），不显示这两项
+                    if !isAdoptedCompanion {
+                        Button { showMemories = true } label: { Label(loc.t("memories.title"), systemImage: "brain.head.profile") }
+                        Button { openEditCompanion() } label: { Label(loc.t("companion.edit"), systemImage: "pencil") }
+                    }
                     Button { showBgPicker = true } label: { Label(loc.t("bg.title"), systemImage: "photo.on.rectangle") }
                     Button { runSuggest() } label: { Label(loc.t("conv.smartReply"), systemImage: "wand.and.stars") }
                 } else {
@@ -694,9 +700,10 @@ struct GroupMembersView: View {
 
     private var amOwner: Bool { members.first { $0.user_id == myId }?.role == "owner" }
     private var countSuffix: String {
-        let humans = members.filter { !$0.is_ai }.count
-        if let cap = conversation.member_cap { return " \(humans)/\(cap)" }
-        return " \(humans)"
+        // 显示总人数（含 AI 搭子）；cap 仅约束真人，故只在总数后附注上限
+        let total = members.count
+        if let cap = conversation.member_cap { return " \(total)/\(cap)" }
+        return " \(total)"
     }
 
     var body: some View {

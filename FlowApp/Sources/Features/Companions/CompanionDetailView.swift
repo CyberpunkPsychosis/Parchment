@@ -23,16 +23,19 @@ struct CompanionDetailView: View {
                     if !milestones.isEmpty { milestonesCard }
                     if !diary.isEmpty { diaryCard }
                     lineageCard
-                    Button { showMemories = true } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "brain.head.profile")
-                            Text(loc.t("growth.memories"))
+                    // 认领来的搭子：记忆锁定（不可查看/删除前任主人的记忆），保留惊喜感
+                    if !companion.adopted {
+                        Button { showMemories = true } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "brain.head.profile")
+                                Text(loc.t("growth.memories"))
+                            }
+                            .font(FlowTheme.body(15)).foregroundStyle(FlowTheme.teal)
+                            .frame(maxWidth: .infinity).padding(.vertical, 13)
+                            .background(RoundedRectangle(cornerRadius: 16).strokeBorder(FlowTheme.teal.opacity(0.5), lineWidth: 1.4))
                         }
-                        .font(FlowTheme.body(15)).foregroundStyle(FlowTheme.teal)
-                        .frame(maxWidth: .infinity).padding(.vertical, 13)
-                        .background(RoundedRectangle(cornerRadius: 16).strokeBorder(FlowTheme.teal.opacity(0.5), lineWidth: 1.4))
+                        .padding(.horizontal, 16)
                     }
-                    .padding(.horizontal, 16)
                     Spacer(minLength: 20)
                 }
                 .padding(.top, 18)

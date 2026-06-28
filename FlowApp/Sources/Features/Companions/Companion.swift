@@ -11,6 +11,7 @@ struct Companion: Codable, Identifiable, Hashable {
     let greeting: String
     var visibility: String = "private"
     var memory_count: Int = 0
+    var adopted: Bool = false        // 认领来的搭子：记忆/人设锁定，保留惊喜感
     // —— 成长系统 ——
     var exp: Int = 0
     var level: Int = 1

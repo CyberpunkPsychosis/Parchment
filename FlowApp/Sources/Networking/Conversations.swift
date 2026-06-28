@@ -84,6 +84,7 @@ struct ConvMemberDTO: Codable, Identifiable, Hashable {
     let tint: String
     var role: String? = nil
     var avatar_url: String? = nil
+    var adopted: Bool = false        // AI 搭子是否认领来的（认领的记忆/人设锁定）
 
     var id: String { is_ai ? "c\(companion_id ?? 0)" : "u\(user_id ?? 0)" }
     var tintColor: Color { FlowTheme.tint(tint) }

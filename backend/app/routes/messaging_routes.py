@@ -213,7 +213,7 @@ def conv_dict(db: Session, conv: Conversation, uid: int) -> dict:
     return {"id": conv.id, "type": conv.type, "group_id": conv.group_id,
             "title": title, "avatar": avatar, "avatar_url": avatar_url, "tint": tint,
             "is_group": conv.type == "group",
-            "member_count": len(human),
+            "member_count": len(members),   # 含 AI 搭子：加搭子后群人数 +1
             "member_cap": conv.member_cap,
             "announcement": conv.announcement,
             "preview": preview,
@@ -474,7 +474,9 @@ def conversation_members(cid: int, user: User = Depends(get_current_user), db: S
             c = db.query(Companion).filter(Companion.id == m.companion_id).first()
             if c:
                 out.append({"is_ai": True, "companion_id": c.id, "name": c.name,
-                            "initials": c.avatar, "tint": c.tint})
+                            "initials": c.avatar, "tint": c.tint,
+                            "avatar_url": c.avatar_url,
+                            "adopted": c.forked_from_snapshot_id is not None})
         elif m.user_id:
             u = db.query(User).filter(User.id == m.user_id).first()
             name = u.nickname if u else "用户"

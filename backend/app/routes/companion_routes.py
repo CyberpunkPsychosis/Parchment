@@ -89,9 +89,11 @@ class CompanionPatch(BaseModel):
 def update_companion(cid: int, body: CompanionPatch,
                      user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     c = _owned(db, user, cid)
+    adopted = c.forked_from_snapshot_id is not None
     if body.name is not None and body.name.strip():
         c.name = body.name.strip()
-    if body.persona is not None and body.persona.strip():
+    # 认领的搭子：人设是前任主人养出来的，不可改写（保留惊喜感）；仅自建的可改
+    if body.persona is not None and body.persona.strip() and not adopted:
         c.persona = body.persona.strip()
     if body.avatar is not None and body.avatar.strip():
         c.avatar = body.avatar.strip()
@@ -132,8 +134,12 @@ def delete_companion(cid: int, user: User = Depends(get_current_user), db: Sessi
 
 @router.get("/companions/{cid}/memories")
 def list_memories(cid: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    _owned(db, user, cid)
-    rows = db.query(Memory).filter(Memory.companion_id == cid).order_by(Memory.created_at.desc()).all()
+    c = _owned(db, user, cid)
+    q = db.query(Memory).filter(Memory.companion_id == cid)
+    if c.forked_from_snapshot_id is not None:
+        # 认领的搭子：隐藏继承自前任主人的记忆，保留「惊喜感」
+        q = q.filter(Memory.source != "inherited")
+    rows = q.order_by(Memory.created_at.desc()).all()
     return {"memories": [m.public_dict() for m in rows]}
 
 
@@ -172,7 +178,9 @@ def delete_memory(mid: int, user: User = Depends(get_current_user), db: Session 
     m = db.query(Memory).filter(Memory.id == mid).first()
     if not m:
         raise HTTPException(status_code=404, detail="记忆不存在")
-    _owned(db, user, m.companion_id)  # 校验该搭子属于当前用户
+    c = _owned(db, user, m.companion_id)  # 校验该搭子属于当前用户
+    if c.forked_from_snapshot_id is not None and m.source == "inherited":
+        raise HTTPException(status_code=403, detail="认领搭子继承来的记忆不可删除")
     db.delete(m)
     db.commit()
     return {"ok": True}
@@ -180,9 +188,12 @@ def delete_memory(mid: int, user: User = Depends(get_current_user), db: Session 
 
 @router.delete("/companions/{cid}/memories")
 def clear_memories(cid: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """一键清空该搭子的全部记忆。"""
-    _owned(db, user, cid)
-    n = db.query(Memory).filter(Memory.companion_id == cid).delete()
+    """一键清空该搭子的记忆（认领的只清自己积累的，保留继承记忆）。"""
+    c = _owned(db, user, cid)
+    q = db.query(Memory).filter(Memory.companion_id == cid)
+    if c.forked_from_snapshot_id is not None:
+        q = q.filter(Memory.source != "inherited")
+    n = q.delete()
     db.commit()
     return {"ok": True, "deleted": n}
 
