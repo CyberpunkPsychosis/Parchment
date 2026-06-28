@@ -22,7 +22,7 @@ final class Localization: ObservableObject {
     private static let table: [String: [Lang: String]] = [
         // App / nav
         "app.name":        [.zh: "羊皮纸", .en: "Parchment"],
-        "app.tagline":     [.zh: "和搭子，一起慢慢长大", .en: "Grow together with your companions"],
+        "app.tagline":     [.zh: "每一次交流，都是思想的痕迹", .en: "Every exchange leaves a trace of thought"],
         "nav.chats":       [.zh: "聊天", .en: "Chats"],
         "nav.companions":  [.zh: "搭子", .en: "AI"],
         "nav.groups":      [.zh: "群组", .en: "Groups"],
